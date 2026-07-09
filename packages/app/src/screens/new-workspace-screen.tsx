@@ -1890,6 +1890,11 @@ export function NewWorkspaceScreen({
   const { status: checkoutStatus } = useCheckoutStatusQuery({
     serverId: selectedServerId,
     cwd: selectedSourceDirectory ?? "",
+    // The New Workspace screen is opened deliberately and short-lived, so it must
+    // reflect the project's live checkout each time. A frozen cache (staleTime:
+    // Infinity) would pre-fill a stale base branch after the user switches branches
+    // in the underlying checkout. Refetch on mount with a short stale window.
+    staleTime: 5_000,
   });
 
   const worktreeSupport = selectedProject

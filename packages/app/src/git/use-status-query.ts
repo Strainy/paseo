@@ -11,9 +11,14 @@ export const CHECKOUT_STATUS_STALE_TIME = 15_000;
 interface UseCheckoutStatusQueryOptions {
   serverId: string;
   cwd: string;
+  staleTime?: number;
 }
 
-export function useCheckoutStatusQuery({ serverId, cwd }: UseCheckoutStatusQueryOptions) {
+export function useCheckoutStatusQuery({
+  serverId,
+  cwd,
+  staleTime = Infinity,
+}: UseCheckoutStatusQueryOptions) {
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
@@ -27,10 +32,10 @@ export function useCheckoutStatusQuery({ serverId, cwd }: UseCheckoutStatusQuery
       return await fetchCheckoutStatus({ client, serverId, cwd });
     },
     enabled: !!client && isConnected && !!cwd,
-    staleTime: Infinity,
-    // Freshness is push-driven (checkout_status_update applied globally); with
-    // staleTime: Infinity, refetchOnMount only fires after an explicit invalidation
-    // (e.g. reconnect), which is exactly when the push stream may have been missed.
+    staleTime,
+    // Freshness is push-driven (checkout_status_update applied globally) for the
+    // default infinite stale window. Callers with a finite window also refresh
+    // stale data when they mount.
     refetchOnMount: true,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
