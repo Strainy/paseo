@@ -220,7 +220,7 @@ interface RenderOptions {
   onImportedAgent?: (agentId: string) => void;
   onImported?: (agent: Awaited<ReturnType<DaemonClient["importAgent"]>>) => void;
   cwd?: string | null;
-  workspaceId?: string;
+  workspaceId?: string | null;
   supportsSearch?: boolean;
   projects?: Array<{ iconWorkingDir: string; projectName: string }>;
   snapshot?: {
@@ -255,6 +255,12 @@ function renderSheet(
   });
 
   const cwd = options && "cwd" in options ? (options.cwd ?? undefined) : "/repo/paseo";
+  let workspaceId: string | undefined;
+  if (options && "workspaceId" in options) {
+    workspaceId = options.workspaceId ?? undefined;
+  } else if (cwd) {
+    workspaceId = "workspace-paseo";
+  }
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -263,7 +269,7 @@ function renderSheet(
         client={client}
         serverId="server-1"
         cwd={cwd}
-        workspaceId={options?.workspaceId}
+        workspaceId={workspaceId}
         onClose={options?.onClose ?? vi.fn()}
         onImportedAgent={options?.onImportedAgent ?? vi.fn()}
         onImported={options?.onImported}
@@ -526,6 +532,7 @@ describe("ImportSessionSheet", () => {
             client={client}
             serverId="server-1"
             cwd="/repo/paseo"
+            workspaceId="workspace-paseo"
             onClose={vi.fn()}
             onImportedAgent={vi.fn()}
           />
@@ -647,6 +654,7 @@ describe("ImportSessionSheet", () => {
       providerId: "claude",
       providerHandleId: "provider-thread-1",
       cwd: "/repo/paseo",
+      workspaceId: "workspace-paseo",
     });
     expect(onImportedAgent).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -1275,6 +1283,47 @@ describe("ImportSessionSheet", () => {
     });
     expect(onImported).toHaveBeenCalledWith(expect.objectContaining({ id: "agent-imported" }));
     expect(onImportedAgent).not.toHaveBeenCalled();
+  });
+
+  it("lists linked-worktree sessions for an unbound cwd and resumes one in its original cwd", async () => {
+    const linkedCwd = "/home/me/worktrees/paseo-feature";
+    const fetchRecentProviderSessions = vi.fn(async () => ({
+      requestId: "recent-provider-sessions",
+      entries: [
+        createProviderSessionEntry({
+          providerId: "claude",
+          providerLabel: "Claude Code",
+          cwd: linkedCwd,
+        }),
+      ],
+    }));
+    const importAgent = vi.fn(async () => createImportedAgentSnapshot("agent-imported"));
+
+    renderSheet(createRecentSessionsClient(fetchRecentProviderSessions, importAgent), {
+      cwd: "/home/me/paseo",
+      workspaceId: null,
+      snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
+    });
+
+    await waitFor(() => {
+      expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
+        cwd: "/home/me/paseo",
+        includeLinkedWorktrees: true,
+        providers: ["claude"],
+        limit: 15,
+      });
+    });
+    await screen.findByText(linkedCwd);
+    fireEvent.click(await screen.findByTestId("import-session-session-claude-provider-thread-1"));
+
+    await waitFor(() => {
+      expect(importAgent).toHaveBeenCalledWith({
+        providerId: "claude",
+        providerHandleId: "provider-thread-1",
+        cwd: linkedCwd,
+        sourceCwd: "/home/me/paseo",
+      });
+    });
   });
 
   it("refetches sessions when the refresh button is clicked", async () => {
