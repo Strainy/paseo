@@ -56,6 +56,8 @@ export function createNoopWorkspaceGitService(
     listStashes: async () => [],
     listWorktrees: async () => [],
     invalidateWorktrees: () => {},
+    getGitCheckoutIdentity: async () => null,
+    listLinkedWorktrees: async () => [],
     getProjectSlug: async (cwd: string) => {
       const snapshot = createNoGitWorkspaceRuntimeSnapshot(cwd);
       return deriveProjectSlug(cwd, snapshot.git.isGit ? snapshot.git.remoteUrl : null);
