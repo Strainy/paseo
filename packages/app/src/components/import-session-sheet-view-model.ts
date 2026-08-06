@@ -20,9 +20,28 @@ export function nextPageLimit(limit: number): number {
 export function requiresImportSessionsHostUpgrade(input: {
   supportsSnapshot: boolean;
   workspaceId?: string | null;
+  usesLinkedWorktreeScope: boolean;
+  supportsLinkedWorktrees: boolean;
   supportsWorkspaceTarget: boolean;
 }): boolean {
-  return !input.supportsSnapshot || (Boolean(input.workspaceId) && !input.supportsWorkspaceTarget);
+  return (
+    !input.supportsSnapshot ||
+    (Boolean(input.workspaceId) && !input.supportsWorkspaceTarget) ||
+    (input.usesLinkedWorktreeScope && !input.supportsLinkedWorktrees)
+  );
+}
+
+/**
+ * A cwd with no workspace also lists sessions from the checkout's linked
+ * worktrees, so its rows can come from several directories. A sheet scoped to
+ * one directory names it once instead of on every row.
+ */
+export function resolveSessionsListScope(
+  scopeCwd: string | null,
+  workspaceId: string | null | undefined,
+): { includeLinkedWorktrees: boolean; showRowFolders: boolean } {
+  const includeLinkedWorktrees = Boolean(scopeCwd && !workspaceId);
+  return { includeLinkedWorktrees, showRowFolders: scopeCwd === null || includeLinkedWorktrees };
 }
 
 export interface SessionsQueryResult {
