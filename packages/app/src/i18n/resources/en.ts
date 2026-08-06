@@ -1150,6 +1150,7 @@ export const en = {
       createWorktreeFailed: "Failed to create worktree",
       composerStateRequired: "Composer state is required",
       selectModel: "Select a model",
+      importedSessionWorkspaceMissing: "The imported session is missing workspace information",
     },
     tooltips: {
       project: "Choose the project",

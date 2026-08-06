@@ -1171,6 +1171,8 @@ export const fr: TranslationResources = {
       createWorktreeFailed: "Échec de la création de l'arbre de travail",
       composerStateRequired: "L'état du compositeur est requis",
       selectModel: "Sélectionnez un modèle",
+      importedSessionWorkspaceMissing:
+        "La session importée ne contient pas d'informations sur l'espace de travail",
     },
     tooltips: {
       project: "Choose the project",

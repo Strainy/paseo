@@ -1152,6 +1152,7 @@ export const ja: TranslationResources = {
       createWorktreeFailed: "ワークツリーの作成に失敗しました",
       composerStateRequired: "コンポーザーの状態が必要です",
       selectModel: "モデルを選択してください",
+      importedSessionWorkspaceMissing: "インポートしたセッションにワークスペース情報がありません",
     },
     tooltips: {
       project: "Choose the project",
