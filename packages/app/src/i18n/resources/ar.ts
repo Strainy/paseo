@@ -1266,6 +1266,7 @@ export const ar: TranslationResources = {
       createWorktreeFailed: "فشل في إنشاء شجرة العمل",
       composerStateRequired: "حالة الملحن مطلوبة",
       selectModel: "اختر نموذجا",
+      importedSessionWorkspaceMissing: "تفتقد الجلسة المستوردة معلومات مساحة العمل",
     },
     tooltips: {
       project: "Choose the project",
