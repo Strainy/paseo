@@ -1,6 +1,7 @@
 import { defineLanguageFacet, Language, StreamLanguage } from "@codemirror/language";
 import { dart } from "@codemirror/legacy-modes/mode/clike";
 import { dockerFile } from "@codemirror/legacy-modes/mode/dockerfile";
+import { haskell } from "@codemirror/legacy-modes/mode/haskell";
 import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { swift } from "@codemirror/legacy-modes/mode/swift";
 import { parser as jsParser } from "@lezer/javascript";
@@ -98,6 +99,8 @@ const languagesByExtension: Record<string, Language> = {
   tf: hclLanguage,
   tfvars: hclLanguage,
   hcl: hclLanguage,
+  // Haskell
+  hs: StreamLanguage.define(haskell),
   // Elixir
   ex: language(elixirParser),
   exs: language(elixirParser),
