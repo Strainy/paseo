@@ -1379,6 +1379,8 @@ export const FetchRecentProviderSessionsRequestMessageSchema = z.object({
   type: z.literal("fetch_recent_provider_sessions_request"),
   requestId: z.string(),
   cwd: z.string().optional(),
+  // COMPAT(importSessionLinkedWorktrees): added in v0.4.1, remove optional after 2027-02-17.
+  includeLinkedWorktrees: z.boolean().optional(),
   providers: z.array(z.string()).optional(),
   since: z.string().optional(),
   limit: z.number().int().positive().max(200).optional(),
@@ -1761,6 +1763,8 @@ export const ImportAgentRequestMessageSchema = z.object({
   providerHandleId: z.string().optional(),
   cwd: z.string().optional(),
   workspaceId: z.string().optional(),
+  // COMPAT(importSessionLinkedWorktrees): added in v0.4.1, remove optional after 2027-02-17.
+  sourceCwd: z.string().min(1).optional(),
   labels: z.record(z.string(), z.string()).optional(),
   requestId: z.string(),
 });
@@ -3558,6 +3562,8 @@ export const ServerInfoStatusPayloadSchema = z
         importSessionWorkspaceTarget: z.boolean().optional(),
         // COMPAT(importSessionSearch): added in v0.8.0, remove gate after 2027-03-02.
         importSessionSearch: z.boolean().optional(),
+        // COMPAT(importSessionLinkedWorktrees): added in v0.4.1, remove gate after 2027-02-17.
+        importSessionLinkedWorktrees: z.boolean().optional(),
         // COMPAT(forgeProviders): added in v0.2.0-beta.1. Drop the gate after
         // 2027-01-17 once the supported daemon floor is >= v0.2.0.
         // Daemon advertises pluggable non-GitHub forge support (the forge registry);
