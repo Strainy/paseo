@@ -25,6 +25,7 @@ describe("isLanguageSupported", () => {
     expect(isLanguageSupported("main.tf")).toBe(true);
     expect(isLanguageSupported("prod.tfvars")).toBe(true);
     expect(isLanguageSupported("terragrunt.hcl")).toBe(true);
+    expect(isLanguageSupported("test.hs")).toBe(true);
     expect(isLanguageSupported("test.ex")).toBe(true);
     expect(isLanguageSupported("Counter.svelte")).toBe(true);
     expect(isLanguageSupported("Page.astro")).toBe(true);
@@ -71,6 +72,7 @@ describe("getSupportedExtensions", () => {
     expect(extensions).toContain("tf");
     expect(extensions).toContain("tfvars");
     expect(extensions).toContain("hcl");
+    expect(extensions).toContain("hs");
     expect(extensions).toContain("json");
     expect(extensions).toContain("svelte");
     expect(extensions).toContain("astro");
