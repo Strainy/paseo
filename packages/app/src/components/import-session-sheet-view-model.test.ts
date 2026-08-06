@@ -83,6 +83,8 @@ describe("requiresImportSessionsHostUpgrade", () => {
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
         workspaceId: null,
+        usesLinkedWorktreeScope: false,
+        supportsLinkedWorktrees: false,
         supportsWorkspaceTarget: false,
       }),
     ).toBe(false);
@@ -93,6 +95,8 @@ describe("requiresImportSessionsHostUpgrade", () => {
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
         workspaceId: "ws-current",
+        usesLinkedWorktreeScope: false,
+        supportsLinkedWorktrees: false,
         supportsWorkspaceTarget: false,
       }),
     ).toBe(true);
@@ -100,6 +104,29 @@ describe("requiresImportSessionsHostUpgrade", () => {
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
         workspaceId: "ws-current",
+        usesLinkedWorktreeScope: false,
+        supportsLinkedWorktrees: false,
+        supportsWorkspaceTarget: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("requires host support when a cwd import scans linked worktrees", () => {
+    expect(
+      requiresImportSessionsHostUpgrade({
+        supportsSnapshot: true,
+        workspaceId: null,
+        usesLinkedWorktreeScope: true,
+        supportsLinkedWorktrees: false,
+        supportsWorkspaceTarget: true,
+      }),
+    ).toBe(true);
+    expect(
+      requiresImportSessionsHostUpgrade({
+        supportsSnapshot: true,
+        workspaceId: null,
+        usesLinkedWorktreeScope: true,
+        supportsLinkedWorktrees: true,
         supportsWorkspaceTarget: true,
       }),
     ).toBe(false);
