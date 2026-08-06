@@ -83,6 +83,10 @@ import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-uti
 import { getAgentStatusPriority } from "@getpaseo/protocol/agent-state-bucket";
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
+import {
+  createImportSessionCwdScopeResolver,
+  type ImportSessionCwdScopeResolver,
+} from "./import-session-cwd-scope.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
 import {
   CLIENT_SHUTDOWN_RPC_REASON,
@@ -732,6 +736,7 @@ export class Session {
   private readonly github: ForgeService;
   private readonly renameCurrentBranch: typeof renameCurrentBranchDefault;
   private readonly workspaceGitService: WorkspaceGitService;
+  private readonly importSessionCwdScopeResolver: ImportSessionCwdScopeResolver;
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly gitMutation: GitMutationService;
   private readonly workspaceProvisioning: WorkspaceProvisioningService;
@@ -905,6 +910,9 @@ export class Session {
     this.github = github ?? createGitHubService();
     this.renameCurrentBranch = renameCurrentBranch ?? renameCurrentBranchDefault;
     this.workspaceGitService = workspaceGitService;
+    this.importSessionCwdScopeResolver = createImportSessionCwdScopeResolver({
+      workspaceGitService: this.workspaceGitService,
+    });
     this.gitMutation = createGitMutationService({
       workspaceGitService: this.workspaceGitService,
       logger: this.sessionLogger,
@@ -917,6 +925,7 @@ export class Session {
       projectRegistry: this.projectRegistry,
       workspaceGitService: this.workspaceGitService,
       isDirectory: (path) => this.filesystem.isDirectory(path),
+      importSessionCwdScopeResolver: this.importSessionCwdScopeResolver,
       logger: this.sessionLogger,
     });
     this.workspaceRecovery = createWorkspaceRecoveryService({
@@ -6290,6 +6299,7 @@ export class Session {
         agentManager: this.agentManager,
         agentStorage: this.agentStorage,
         providerSnapshotManager: this.providerSnapshotManager,
+        importSessionCwdScopeResolver: this.importSessionCwdScopeResolver,
       });
       this.emit({
         type: "fetch_recent_provider_sessions_response",
