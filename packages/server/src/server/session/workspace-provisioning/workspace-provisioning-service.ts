@@ -2,6 +2,7 @@ import type { PluginLifecycle } from "../../plugins/lifecycle/index.js";
 import { describeHookWorkspace } from "../../plugins/lifecycle/index.js";
 import { basename, resolve } from "node:path";
 import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import { isDeepStrictEqual } from "node:util";
 import type { Logger } from "pino";
 import {
   generateWorkspaceId,
@@ -20,6 +21,10 @@ import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.j
 import { deriveProjectKey } from "../../project-key.js";
 import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../../../utils/path.js";
 import type { UntrustedWorkspaceSource } from "../../workspace-automation-gate.js";
+import {
+  createImportSessionCwdScopeResolver,
+  type ImportSessionCwdScopeResolver,
+} from "../../import-session-cwd-scope.js";
 
 export interface ResolveOrCreateWorkspaceIdInput {
   createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
@@ -33,6 +38,7 @@ export interface ResolveOrCreateWorkspaceIdInput {
 export interface ImportWorkspaceInput {
   cwd: string;
   requestedWorkspaceId?: string;
+  requestedSourceCwd?: string;
 }
 
 export interface ImportWorkspaceResult<T> {
@@ -103,12 +109,19 @@ export function createWorkspaceProvisioningService(deps: {
   serverId?: string;
   workspaceRegistry: WorkspaceRegistry;
   projectRegistry: ProjectRegistry;
-  workspaceGitService: Pick<WorkspaceGitService, "getCheckout" | "getSnapshot">;
+  workspaceGitService: Pick<
+    WorkspaceGitService,
+    "getCheckout" | "getSnapshot" | "getGitCheckoutIdentity" | "listLinkedWorktrees"
+  >;
   isDirectory: (path: string) => Promise<boolean>;
+  importSessionCwdScopeResolver?: ImportSessionCwdScopeResolver;
   logger: Logger;
   lifecycle?: PluginLifecycle;
 }): WorkspaceProvisioningService {
   const { serverId, workspaceRegistry, projectRegistry, workspaceGitService, logger } = deps;
+  const importSessionCwdScopeResolver =
+    deps.importSessionCwdScopeResolver ??
+    createImportSessionCwdScopeResolver({ workspaceGitService });
 
   /**
    * Placement facts at a workspace directory, or null when there is nothing
@@ -129,7 +142,10 @@ export function createWorkspaceProvisioningService(deps: {
     input: ImportWorkspaceInput,
     operation: (workspace: PersistedWorkspaceRecord) => Promise<T>,
   ): Promise<ImportWorkspaceResult<T>> {
-    if (input.requestedWorkspaceId) {
+    if (input.requestedWorkspaceId !== undefined && input.requestedSourceCwd !== undefined) {
+      throw new Error("Import cannot target both a workspace and a source directory");
+    }
+    if (input.requestedWorkspaceId !== undefined) {
       const workspace = await workspaceRegistry.get(input.requestedWorkspaceId);
       if (!workspace || workspace.archivedAt) {
         throw new Error(`Workspace not found: ${input.requestedWorkspaceId}`);
@@ -151,7 +167,24 @@ export function createWorkspaceProvisioningService(deps: {
       projectRegistry.list(),
       workspaceRegistry.list(),
     ]);
-    const workspace = await findOrCreateWorkspaceForDirectory(input.cwd);
+    let projectIdForImport: string | undefined;
+    if (input.requestedSourceCwd !== undefined) {
+      const scope = await importSessionCwdScopeResolver.resolve(input.requestedSourceCwd, {
+        force: true,
+        reason: "provider-session-import",
+      });
+      if (!(await scope.matchesCwd(input.cwd))) {
+        throw new Error(
+          `Import cwd is not linked to source directory: ${input.requestedSourceCwd}`,
+        );
+      }
+      projectIdForImport = (await findOrCreateProjectForDirectory(input.requestedSourceCwd))
+        .projectId;
+    }
+
+    const workspace = projectIdForImport
+      ? await createWorkspaceForDirectory(input.cwd, null, projectIdForImport)
+      : await findOrCreateWorkspaceForDirectory(input.cwd);
     const createdWorkspace = workspacesBeforeImport.some(
       (candidate) => candidate.workspaceId === workspace.workspaceId,
     )
@@ -159,6 +192,7 @@ export function createWorkspaceProvisioningService(deps: {
       : workspace;
     const previousProject =
       projectsBeforeImport.find((project) => project.projectId === workspace.projectId) ?? null;
+    const projectAfterWorkspace = await projectRegistry.get(workspace.projectId);
 
     try {
       return {
@@ -167,7 +201,11 @@ export function createWorkspaceProvisioningService(deps: {
       };
     } catch (error) {
       if (createdWorkspace) {
-        await rollbackFailedImportWorkspace(createdWorkspace, previousProject);
+        await rollbackFailedImportWorkspace(
+          createdWorkspace,
+          previousProject,
+          projectAfterWorkspace,
+        );
       }
       throw error;
     }
@@ -176,6 +214,7 @@ export function createWorkspaceProvisioningService(deps: {
   async function rollbackFailedImportWorkspace(
     workspace: PersistedWorkspaceRecord,
     previousProject: PersistedProjectRecord | null,
+    projectAfterWorkspace: PersistedProjectRecord | null,
   ): Promise<void> {
     try {
       await workspaceRegistry.remove(workspace.workspaceId);
@@ -185,9 +224,17 @@ export function createWorkspaceProvisioningService(deps: {
       if (projectHasActiveWorkspace) {
         return;
       }
-      if (previousProject?.archivedAt) {
+      const currentProject = await projectRegistry.get(workspace.projectId);
+      if (
+        !currentProject ||
+        !projectAfterWorkspace ||
+        !isDeepStrictEqual(currentProject, projectAfterWorkspace)
+      ) {
+        return;
+      }
+      if (previousProject) {
         await projectRegistry.upsert(previousProject);
-      } else if (!previousProject) {
+      } else {
         await projectRegistry.remove(workspace.projectId);
       }
     } catch (error) {

@@ -39,6 +39,7 @@ import {
   type ProviderErrorRow,
   resolveImportTarget,
   resolveProvidersToFetch,
+  resolveSessionsListScope,
   requiresImportSessionsHostUpgrade,
   sumFilteredAlreadyImportedCount,
 } from "@/components/import-session-sheet-view-model";
@@ -72,10 +73,11 @@ type RecentSessionsResponse = Awaited<
   ReturnType<RecentProviderSessionsClient["fetchRecentProviderSessions"]>
 >;
 
-type SessionsQueryKey = ReadonlyArray<string | number | null>;
+type SessionsQueryKey = ReadonlyArray<string | number | boolean | null>;
 
 function buildSessionsQueryKey(input: {
   cwd: string | null;
+  includeLinkedWorktrees: boolean;
   query: string;
   limit: number;
   provider?: string;
@@ -83,6 +85,7 @@ function buildSessionsQueryKey(input: {
   return [
     "recent-provider-sessions",
     input.cwd,
+    input.includeLinkedWorktrees,
     input.query,
     input.limit,
     ...(input.provider === undefined ? [] : [input.provider]),
@@ -105,15 +108,25 @@ function buildSessionsQueriesConfig(args: {
   visible: boolean;
   client: RecentProviderSessionsClient | null;
   cwd: string | null;
+  includeLinkedWorktrees: boolean;
   query: string;
   limit: number;
   hostDisconnectedMessage?: string;
 }): SessionsQueryConfig[] {
-  const { providersToFetch, visible, client, cwd, query, limit, hostDisconnectedMessage } = args;
+  const {
+    providersToFetch,
+    visible,
+    client,
+    cwd,
+    includeLinkedWorktrees,
+    query,
+    limit,
+    hostDisconnectedMessage,
+  } = args;
   if (providersToFetch === null) return [];
   const enabled = visible && Boolean(client);
   return providersToFetch.map((provider) => ({
-    queryKey: buildSessionsQueryKey({ cwd, query, limit, provider }),
+    queryKey: buildSessionsQueryKey({ cwd, includeLinkedWorktrees, query, limit, provider }),
     enabled,
     retry: false as const,
     placeholderData: keepPreviousData,
@@ -123,6 +136,7 @@ function buildSessionsQueriesConfig(args: {
       }
       return await client.fetchRecentProviderSessions({
         ...(cwd ? { cwd } : {}),
+        ...(includeLinkedWorktrees ? { includeLinkedWorktrees: true } : {}),
         providers: [provider],
         limit,
         ...(query ? { query } : {}),
@@ -527,9 +541,13 @@ export function ImportSessionSheet({
     enabled: visible,
   });
   const supportsWorkspaceTarget = useHostFeature(serverId, "importSessionWorkspaceTarget");
+  const supportsLinkedWorktrees = useHostFeature(serverId, "importSessionLinkedWorktrees");
+  const usesLinkedWorktreeScope = Boolean(cwd && !workspaceId);
   const requiresHostUpgrade = requiresImportSessionsHostUpgrade({
     supportsSnapshot,
     workspaceId,
+    usesLinkedWorktreeScope,
+    supportsLinkedWorktrees,
     supportsWorkspaceTarget,
   });
 
@@ -543,7 +561,14 @@ export function ImportSessionSheet({
     [snapshotEntries],
   );
 
-  const sessionsQueryRoot = useMemo(() => ["recent-provider-sessions", scopeCwd], [scopeCwd]);
+  const { includeLinkedWorktrees, showRowFolders } = resolveSessionsListScope(
+    scopeCwd,
+    workspaceId,
+  );
+  const sessionsQueryRoot = useMemo(
+    () => ["recent-provider-sessions", scopeCwd, includeLinkedWorktrees],
+    [scopeCwd, includeLinkedWorktrees],
+  );
 
   const queriesConfig = useMemo(
     () =>
@@ -552,11 +577,12 @@ export function ImportSessionSheet({
         visible,
         client,
         cwd: scopeCwd,
+        includeLinkedWorktrees,
         query,
         limit: pageLimit,
         hostDisconnectedMessage: t("workspace.terminal.hostDisconnected"),
       }),
-    [providersToFetch, visible, client, scopeCwd, query, pageLimit, t],
+    [providersToFetch, visible, client, scopeCwd, includeLinkedWorktrees, query, pageLimit, t],
   );
 
   const queries = useQueries({ queries: queriesConfig });
@@ -596,8 +622,6 @@ export function ImportSessionSheet({
     [hostProjects],
   );
 
-  // A scoped sheet only lists one directory, so naming it on every row is noise.
-  const showRowFolders = scopeCwd === null;
   const resolveFolder = useCallback(
     (entry: FetchRecentProviderSessionEntry) =>
       showRowFolders
@@ -694,6 +718,7 @@ export function ImportSessionSheet({
         providerHandleId: entry.providerHandleId,
         cwd: entry.cwd,
         ...(target.workspaceId ? { workspaceId: target.workspaceId } : {}),
+        ...(usesLinkedWorktreeScope && cwd ? { sourceCwd: cwd } : {}),
       });
       return { agent, target };
     },
@@ -738,10 +763,16 @@ export function ImportSessionSheet({
   const handleRetryProvider = useCallback(
     (provider: string) => {
       void queryClient.refetchQueries({
-        queryKey: buildSessionsQueryKey({ cwd: scopeCwd, query, limit: pageLimit, provider }),
+        queryKey: buildSessionsQueryKey({
+          cwd: scopeCwd,
+          includeLinkedWorktrees,
+          query,
+          limit: pageLimit,
+          provider,
+        }),
       });
     },
-    [pageLimit, query, queryClient, scopeCwd],
+    [includeLinkedWorktrees, pageLimit, query, queryClient, scopeCwd],
   );
 
   const handleShowAll = useCallback(() => setIsShowingAllDirectories(true), []);
