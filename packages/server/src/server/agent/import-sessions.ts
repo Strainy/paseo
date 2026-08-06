@@ -1,10 +1,12 @@
 import type { z } from "zod";
 import type { Logger } from "pino";
+import pLimit from "p-limit";
 import type { ProviderSnapshotManager } from "./provider-snapshot-manager.js";
 import type {
   AgentManager,
   ManagedAgent,
   ManagedImportableProviderSession,
+  ManagedImportableSessionsResult,
 } from "./agent-manager.js";
 import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
 import type { AgentPersistenceHandle, AgentProvider } from "./agent-sdk-types.js";
@@ -20,12 +22,18 @@ import type {
 } from "@getpaseo/protocol/messages";
 import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { createRealpathAwarePathMatcher } from "../../utils/path.js";
+import type {
+  ImportSessionCwdScope,
+  ImportSessionCwdScopeResolver,
+} from "../import-session-cwd-scope.js";
 
 type ImportAgentRequestMessage = z.infer<typeof ImportAgentRequestMessageSchema>;
 
 const METADATA_GENERATION_PROMPT_PREFIX =
   "Generate metadata for a coding agent based on the user prompt.";
 const IMPORT_SESSION_SEARCH_SCAN_LIMIT = 500;
+const IMPORT_SESSION_CWD_FANOUT_CONCURRENCY = 4;
+const importSessionCwdFanoutLimits = new WeakMap<object, ReturnType<typeof pLimit>>();
 export type ImportSessionAgentManager = AgentLoaderManager &
   Pick<
     AgentManager,
@@ -47,6 +55,7 @@ export interface NormalizedImportAgentRequest {
   providerHandleId: string;
   cwd?: string;
   workspaceId?: string;
+  sourceCwd?: string;
   labels?: Record<string, string>;
   requestId: string;
 }
@@ -66,6 +75,7 @@ export interface ListImportableProviderSessionsInput {
   agentManager: Pick<AgentManager, "listAgents" | "listImportableSessions">;
   agentStorage: Pick<AgentStorage, "list">;
   providerSnapshotManager: Pick<ProviderSnapshotManager, "getProviderLabel">;
+  importSessionCwdScopeResolver?: ImportSessionCwdScopeResolver;
 }
 
 export interface ListImportableProviderSessionsResult {
@@ -106,11 +116,15 @@ export function normalizeImportAgentRequest(
   if (!provider || !providerHandleId) {
     return { error: "Import requires providerId and providerHandleId" };
   }
+  if (msg.workspaceId !== undefined && msg.sourceCwd !== undefined) {
+    return { error: "Import cannot target both a workspace and a source directory" };
+  }
   return {
     provider: provider as AgentProvider,
     providerHandleId,
     cwd: msg.cwd,
     workspaceId: msg.workspaceId,
+    sourceCwd: msg.sourceCwd,
     labels: msg.labels,
     requestId: msg.requestId,
   };
@@ -120,6 +134,19 @@ export async function listImportableProviderSessions(
   input: ListImportableProviderSessionsInput,
 ): Promise<ListImportableProviderSessionsResult> {
   const { request, agentManager, agentStorage, providerSnapshotManager } = input;
+  const requestCwd = request.cwd;
+  if (request.includeLinkedWorktrees && requestCwd === undefined) {
+    throw new ImportSessionsRequestError(
+      "invalid_scope",
+      "Linked-worktree provider session import requires a cwd",
+    );
+  }
+  const cwdScope =
+    request.includeLinkedWorktrees && requestCwd !== undefined
+      ? await requireImportSessionCwdScopeResolver(input).resolve(requestCwd, {
+          reason: "list-provider-sessions",
+        })
+      : null;
   const limit = request.limit ?? 20;
   const sinceTimestamp = parseRecentProviderSessionsSince(request.since);
   const providerFilter = request.providers ? new Set(request.providers) : undefined;
@@ -132,18 +159,38 @@ export async function listImportableProviderSessions(
   const query = normalizeImportSessionQuery(request.query);
   const listingLimit = query ? IMPORT_SESSION_SEARCH_SCAN_LIMIT : limit + importedSessions.count;
 
-  const listing = await agentManager.listImportableSessions({
-    limit: listingLimit,
-    ...(query ? { query } : {}),
-    ...(query ? { scanLimit: IMPORT_SESSION_SEARCH_SCAN_LIMIT } : {}),
-    providerFilter,
-    cwd: request.cwd,
-  });
+  let sessions: ManagedImportableProviderSession[];
+  let fetchedProviderErrors: Array<{ provider: string; message: string }> = [];
+  if (cwdScope) {
+    const listing = await listImportableSessionsForCwdScope({
+      cwdScope,
+      agentManager,
+      limit: limit + importedSessions.count,
+      providerFilter,
+    });
+    sessions = listing.sessions;
+    fetchedProviderErrors = listing.providerErrors;
+  } else {
+    const listing = await agentManager.listImportableSessions({
+      limit: listingLimit,
+      ...(query ? { query } : {}),
+      ...(query ? { scanLimit: IMPORT_SESSION_SEARCH_SCAN_LIMIT } : {}),
+      providerFilter,
+      cwd: requestCwd,
+    });
+    sessions = listing.sessions;
+    fetchedProviderErrors = listing.providerErrors;
+  }
   let filteredAlreadyImportedCount = 0;
   const candidates: ManagedImportableProviderSession[] = [];
-  const matchesRequestCwd = request.cwd ? createRealpathAwarePathMatcher(request.cwd) : null;
-  for (const session of listing.sessions) {
-    if (matchesRequestCwd && !matchesRequestCwd(session.cwd)) {
+  let matchesRequestCwd: ((candidate: string) => boolean | Promise<boolean>) | null = null;
+  if (cwdScope) {
+    matchesRequestCwd = (candidate) => cwdScope.matchesCwd(candidate);
+  } else if (requestCwd) {
+    matchesRequestCwd = createRealpathAwarePathMatcher(requestCwd);
+  }
+  for (const session of sessions) {
+    if (matchesRequestCwd && !(await matchesRequestCwd(session.cwd))) {
       continue;
     }
     if (sinceTimestamp !== null && session.lastActivityAt.getTime() < sinceTimestamp) {
@@ -173,7 +220,7 @@ export async function listImportableProviderSessions(
   return {
     entries,
     filteredAlreadyImportedCount,
-    providerErrors: listing.providerErrors,
+    providerErrors: fetchedProviderErrors,
   };
 }
 
@@ -192,7 +239,11 @@ export async function importProviderSession(
   const key = await resolveProviderSessionImportMutationKey(input);
   return serializeProviderSessionImport(input.agentManager, key, async () => {
     const placement = await input.workspaceProvisioning.runInImportWorkspace(
-      { cwd, requestedWorkspaceId: input.request.workspaceId },
+      {
+        cwd,
+        requestedWorkspaceId: input.request.workspaceId,
+        requestedSourceCwd: input.request.sourceCwd,
+      },
       (workspace) => importProviderSessionNow(input, cwd, workspace.workspaceId),
     );
     return { ...placement.value, createdWorkspace: placement.createdWorkspace };
@@ -327,6 +378,77 @@ async function rollbackArchivedImport(
       "Failed to restore archived agent record after import failure",
     );
   }
+}
+
+function requireImportSessionCwdScopeResolver(
+  input: ListImportableProviderSessionsInput,
+): ImportSessionCwdScopeResolver {
+  if (!input.importSessionCwdScopeResolver) {
+    throw new ImportSessionsRequestError(
+      "linked_worktree_scope_unavailable",
+      "Linked-worktree provider session import is unavailable",
+    );
+  }
+  return input.importSessionCwdScopeResolver;
+}
+
+async function listImportableSessionsForCwdScope(input: {
+  cwdScope: ImportSessionCwdScope;
+  agentManager: Pick<AgentManager, "listImportableSessions">;
+  limit: number;
+  providerFilter: Set<string> | undefined;
+}): Promise<ManagedImportableSessionsResult> {
+  const limit = getImportSessionCwdFanoutLimit(input.agentManager);
+  const lists = await Promise.all(
+    input.cwdScope.exactCwds.map((cwd) =>
+      limit(() =>
+        input.agentManager.listImportableSessions({
+          limit: input.limit,
+          providerFilter: input.providerFilter,
+          cwd,
+        }),
+      ),
+    ),
+  );
+
+  // The same provider fails once per fanned-out cwd; report it once.
+  const providerErrorsByProvider = new Map<
+    string,
+    ManagedImportableSessionsResult["providerErrors"][number]
+  >();
+  for (const result of lists) {
+    for (const providerError of result.providerErrors) {
+      if (!providerErrorsByProvider.has(providerError.provider)) {
+        providerErrorsByProvider.set(providerError.provider, providerError);
+      }
+    }
+  }
+
+  const sessionsByHandle = new Map<string, ManagedImportableProviderSession>();
+  for (const session of lists.flatMap((result) => result.sessions)) {
+    // A provider can treat cwd as a hint. Filter before deduplication so an
+    // out-of-scope descriptor cannot displace the valid scoped descriptor.
+    if (!(await input.cwdScope.matchesCwd(session.cwd))) continue;
+    const key = toProviderSessionHandleKey(session.provider, session.providerHandleId);
+    const previous = sessionsByHandle.get(key);
+    if (!previous || previous.lastActivityAt.getTime() < session.lastActivityAt.getTime()) {
+      sessionsByHandle.set(key, session);
+    }
+  }
+  return {
+    sessions: Array.from(sessionsByHandle.values()).sort(
+      (left, right) => right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
+    ),
+    providerErrors: Array.from(providerErrorsByProvider.values()),
+  };
+}
+
+function getImportSessionCwdFanoutLimit(agentManager: object): ReturnType<typeof pLimit> {
+  const existing = importSessionCwdFanoutLimits.get(agentManager);
+  if (existing) return existing;
+  const created = pLimit({ concurrency: IMPORT_SESSION_CWD_FANOUT_CONCURRENCY });
+  importSessionCwdFanoutLimits.set(agentManager, created);
+  return created;
 }
 
 function parseRecentProviderSessionsSince(since: string | undefined): number | null {
