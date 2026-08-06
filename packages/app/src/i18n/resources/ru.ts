@@ -1195,6 +1195,8 @@ export const ru: TranslationResources = {
       createWorktreeFailed: "Не удалось создать worktree.",
       composerStateRequired: "Редактор сообщения ещё не готов.",
       selectModel: "Выберите модель",
+      importedSessionWorkspaceMissing:
+        "В импортированном сеансе отсутствуют сведения о рабочем пространстве",
     },
     tooltips: {
       project: "Выберите проект",
