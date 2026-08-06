@@ -20,9 +20,15 @@ export function nextPageLimit(limit: number): number {
 export function requiresImportSessionsHostUpgrade(input: {
   supportsSnapshot: boolean;
   workspaceId?: string | null;
+  usesLinkedWorktreeScope: boolean;
+  supportsLinkedWorktrees: boolean;
   supportsWorkspaceTarget: boolean;
 }): boolean {
-  return !input.supportsSnapshot || (Boolean(input.workspaceId) && !input.supportsWorkspaceTarget);
+  return (
+    !input.supportsSnapshot ||
+    (Boolean(input.workspaceId) && !input.supportsWorkspaceTarget) ||
+    (input.usesLinkedWorktreeScope && !input.supportsLinkedWorktrees)
+  );
 }
 
 export interface SessionsQueryResult {
