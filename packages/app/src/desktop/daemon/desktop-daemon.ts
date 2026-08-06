@@ -40,6 +40,16 @@ export interface LocalTransportTarget {
   transportPath: string;
 }
 
+export interface RemoteSshTransportTarget {
+  [key: string]: unknown;
+  transportType: "ssh";
+  host: string;
+  sshPort?: number;
+  identityFile?: string;
+}
+
+export type DesktopDaemonTransportTarget = LocalTransportTarget | RemoteSshTransportTarget;
+
 interface LocalTransportEventPayload {
   sessionId: string;
   kind: "open" | "message" | "close" | "error";
@@ -179,7 +189,9 @@ export async function listenToLocalTransportEvents(
   return typeof unlisten === "function" ? unlisten : () => {};
 }
 
-export async function openLocalTransportSession(target: LocalTransportTarget): Promise<string> {
+export async function openLocalTransportSession(
+  target: DesktopDaemonTransportTarget,
+): Promise<string> {
   const raw = await invokeDesktopCommand<unknown>("open_local_daemon_transport", target);
   if (typeof raw !== "string" || raw.trim().length === 0) {
     throw new Error("Unexpected local transport session response.");

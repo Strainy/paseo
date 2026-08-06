@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDesktopLocalDaemonTransportFactory } from "./desktop-daemon-transport";
+import {
+  buildDesktopDaemonTransportUrl,
+  createDesktopDaemonTransportFactory,
+} from "./desktop-daemon-transport";
 import { createFakeLocalDaemonTransportRpc } from "./test-local-daemon-transport-rpc";
 
-const LOCAL_URL = "paseo+local://socket?path=%2Ftmp%2Fpaseo.sock";
+const LOCAL_URL = "paseo+desktop://socket?path=%2Ftmp%2Fpaseo.sock";
 
 describe("desktop-daemon-transport", () => {
   it("emits open after the session resolves even if the rust open event raced earlier", async () => {
     const rpc = createFakeLocalDaemonTransportRpc();
-    const transportFactory = createDesktopLocalDaemonTransportFactory(rpc);
+    const transportFactory = createDesktopDaemonTransportFactory(rpc);
     expect(transportFactory).not.toBeNull();
 
     const transport = transportFactory!({ url: LOCAL_URL });
@@ -28,7 +31,7 @@ describe("desktop-daemon-transport", () => {
     const rpc = createFakeLocalDaemonTransportRpc();
     const cleanup = vi.fn();
 
-    const transportFactory = createDesktopLocalDaemonTransportFactory(rpc);
+    const transportFactory = createDesktopDaemonTransportFactory(rpc);
     expect(transportFactory).not.toBeNull();
 
     const transport = transportFactory!({ url: LOCAL_URL });
@@ -42,5 +45,43 @@ describe("desktop-daemon-transport", () => {
 
     expect(rpc.closedSessions).toEqual(["local-session-2"]);
     expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes Remote SSH parameters to the desktop transport bridge", async () => {
+    const rpc = createFakeLocalDaemonTransportRpc();
+    const transportFactory = createDesktopDaemonTransportFactory(rpc);
+    expect(transportFactory).not.toBeNull();
+
+    const url = buildDesktopDaemonTransportUrl({
+      transportType: "ssh",
+      host: "deploy@example.com",
+      sshPort: 2222,
+      identityFile: "/Users/example/.ssh/paseo",
+    });
+    transportFactory!({ url });
+
+    expect(rpc.openCalls).toEqual([
+      {
+        transportType: "ssh",
+        host: "deploy@example.com",
+        sshPort: 2222,
+        identityFile: "/Users/example/.ssh/paseo",
+      },
+    ]);
+  });
+
+  it.each([0, 65536])("rejects an out-of-range Remote SSH port (%s)", (sshPort) => {
+    const transportFactory = createDesktopDaemonTransportFactory(
+      createFakeLocalDaemonTransportRpc(),
+    );
+    expect(transportFactory).not.toBeNull();
+
+    const url = buildDesktopDaemonTransportUrl({
+      transportType: "ssh",
+      host: "deploy@example.com",
+      sshPort,
+    });
+
+    expect(() => transportFactory!({ url })).toThrow("Invalid SSH transport target");
   });
 });
