@@ -1265,6 +1265,7 @@ export const ptBR: TranslationResources = {
       createWorktreeFailed: "Falha ao criar worktree",
       composerStateRequired: "O estado do composer é obrigatório",
       selectModel: "Selecione um modelo",
+      importedSessionWorkspaceMissing: "A sessão importada não contém informações do workspace",
     },
     tooltips: {
       project: "Choose the project",
