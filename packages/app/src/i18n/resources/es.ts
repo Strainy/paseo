@@ -1442,6 +1442,10 @@ export const es: TranslationResources = {
         title: "Conexión directa",
         description: "Red local o VPN.",
       },
+      remoteSsh: {
+        title: "SSH remoto",
+        description: "Conéctate mediante el cliente SSH de escritorio.",
+      },
       scanQr: {
         title: "Escanea el códigoQR",
         description: "Conexión de retransmisión cifrada.",
@@ -1492,6 +1496,27 @@ export const es: TranslationResources = {
         unableToConnect:
           "No se puede conectar. Verifique el host/porty que se pueda acceder al demonio.",
         details: "Detalles:{{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "SSH remoto",
+      helper: "Conéctate a un daemon de Paseo en el host remoto.",
+      fields: {
+        host: "Host",
+        port: "Puerto SSH",
+        identityFile: "Ruta del archivo de identidad",
+        optional: "Opcional",
+      },
+      actions: {
+        cancel: "Cancelar",
+        connect: "Conectar",
+        connecting: "Conectando...",
+      },
+      errors: {
+        hostRequired: "El host es obligatorio",
+        invalidHost: "Introduce un host SSH válido",
+        invalidPort: "El puerto SSH debe estar entre 1 y 65535",
+        failedToConnect: "No se pudo conectar por SSH. {{detail}}",
       },
     },
     link: {
@@ -2114,6 +2139,7 @@ export const es: TranslationResources = {
       badges: {
         relay: "Relé",
         local: "Local",
+        remoteSsh: "SSH remoto",
       },
       connections: {
         title: "Conexiones",

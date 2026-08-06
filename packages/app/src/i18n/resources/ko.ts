@@ -1411,6 +1411,10 @@ export const ko: TranslationResources = {
         title: "직접 연결",
         description: "로컬 네트워크 또는 VPN.",
       },
+      remoteSsh: {
+        title: "원격 SSH",
+        description: "데스크톱 SSH 클라이언트를 통해 연결합니다.",
+      },
       scanQr: {
         title: "QR 코드 스캔",
         description: "암호화된 릴레이 연결.",
@@ -1459,6 +1463,27 @@ export const ko: TranslationResources = {
         tlsError: "TLS 오류. 직접 연결은 데몬 앞에 TLS 종단 장치가 있을 때만 SSL을 사용합니다.",
         unableToConnect: "연결할 수 없습니다. 호스트/포트와 데몬에 접근 가능한지 확인하세요.",
         details: "세부 정보: {{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "원격 SSH",
+      helper: "원격 호스트에서 실행 중인 Paseo 데몬에 연결합니다.",
+      fields: {
+        host: "호스트",
+        port: "SSH 포트",
+        identityFile: "ID 파일 경로",
+        optional: "선택 사항",
+      },
+      actions: {
+        cancel: "취소",
+        connect: "연결",
+        connecting: "연결 중...",
+      },
+      errors: {
+        hostRequired: "호스트가 필요합니다",
+        invalidHost: "유효한 SSH 호스트를 입력하세요",
+        invalidPort: "SSH 포트는 1에서 65535 사이여야 합니다",
+        failedToConnect: "SSH로 연결할 수 없습니다. {{detail}}",
       },
     },
     link: {
@@ -2076,6 +2101,7 @@ export const ko: TranslationResources = {
       badges: {
         relay: "릴레이",
         local: "로컬",
+        remoteSsh: "원격 SSH",
       },
       connections: {
         title: "연결",

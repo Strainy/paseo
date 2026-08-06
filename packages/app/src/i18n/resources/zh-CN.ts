@@ -1384,6 +1384,10 @@ export const zhCN: TranslationResources = {
         title: "直接连接",
         description: "本地网络或 VPN。",
       },
+      remoteSsh: {
+        title: "远程 SSH",
+        description: "通过桌面 SSH 客户端连接。",
+      },
       scanQr: {
         title: "扫描二维码",
         description: "加密 relay 连接。",
@@ -1432,6 +1436,27 @@ export const zhCN: TranslationResources = {
         tlsError: "TLS 错误。只有 daemon 前方有 TLS terminator 时，直接连接才使用 SSL。",
         unableToConnect: "无法连接。请检查 host/port，并确认 daemon 可达。",
         details: "详情：{{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "远程 SSH",
+      helper: "连接到远程主机上运行的 Paseo 守护进程。",
+      fields: {
+        host: "主机",
+        port: "SSH 端口",
+        identityFile: "身份文件路径",
+        optional: "可选",
+      },
+      actions: {
+        cancel: "取消",
+        connect: "连接",
+        connecting: "正在连接...",
+      },
+      errors: {
+        hostRequired: "主机为必填项",
+        invalidHost: "请输入有效的 SSH 主机",
+        invalidPort: "SSH 端口必须介于 1 和 65535 之间",
+        failedToConnect: "无法通过 SSH 连接。{{detail}}",
       },
     },
     link: {
@@ -2042,6 +2067,7 @@ export const zhCN: TranslationResources = {
       badges: {
         relay: "Relay",
         local: "本地",
+        remoteSsh: "远程 SSH",
       },
       connections: {
         title: "连接",

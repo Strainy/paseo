@@ -1,10 +1,21 @@
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createServer, type Server, type Socket } from "node:net";
 import { BrowserWindow } from "electron";
 import { WebSocket, type RawData } from "ws";
 
-interface TransportTarget {
+interface LocalTransportTarget {
   transportType: "socket" | "pipe";
   transportPath: string;
 }
+
+export interface SshTransportTarget {
+  transportType: "ssh";
+  host: string;
+  sshPort?: number;
+  identityFile?: string;
+}
+
+type TransportTarget = LocalTransportTarget | SshTransportTarget;
 
 interface TransportEventPayload {
   sessionId: string;
@@ -20,9 +31,18 @@ interface Session {
   id: string;
   ws: WebSocket;
   state: "opening" | "open" | "closing" | "closed";
+  closeTarget: () => void;
+}
+
+interface TransportEndpoint {
+  url: string;
+  close: () => void;
+  failureDetail: () => string | null;
 }
 
 const WS_ENDPOINT_PATH = "/ws";
+const REMOTE_DAEMON_ENDPOINT = "127.0.0.1:6767";
+const SSH_STDERR_LIMIT = 8192;
 
 let nextSessionId = 0;
 const sessions = new Map<string, Session>();
@@ -43,13 +63,178 @@ function emitTransportEvent(payload: TransportEventPayload): void {
  * The part before `:` is the IPC path, the part after is the HTTP request
  * path used during the WebSocket upgrade handshake.
  */
-function buildLocalWebSocketUrl(target: TransportTarget): string {
+function buildLocalWebSocketUrl(target: LocalTransportTarget): string {
   const ipcPath = target.transportPath;
   return `ws+unix://${ipcPath}:${WS_ENDPOINT_PATH}`;
 }
 
 function describeTransportTarget(target: TransportTarget): string {
+  if (target.transportType === "ssh") {
+    return `Remote SSH host ${target.host}`;
+  }
   return target.transportType === "pipe" ? "local daemon pipe" : "local daemon socket";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseTransportTarget(value: unknown): TransportTarget {
+  if (!isRecord(value)) {
+    throw new Error("Desktop transport target must be an object.");
+  }
+
+  if (value.transportType === "socket" || value.transportType === "pipe") {
+    const transportPath = typeof value.transportPath === "string" ? value.transportPath.trim() : "";
+    if (!transportPath) {
+      throw new Error("Local transport path is required.");
+    }
+    return { transportType: value.transportType, transportPath };
+  }
+
+  if (value.transportType !== "ssh") {
+    throw new Error("Unsupported desktop transport type.");
+  }
+
+  const host = typeof value.host === "string" ? value.host.trim() : "";
+  if (!host) {
+    throw new Error("SSH host is required.");
+  }
+  if (/\s/.test(host) || host.startsWith("-")) {
+    throw new Error("SSH host is invalid.");
+  }
+
+  const sshPort = value.sshPort;
+  if (
+    sshPort !== undefined &&
+    (typeof sshPort !== "number" || !Number.isInteger(sshPort) || sshPort < 1 || sshPort > 65535)
+  ) {
+    throw new Error("SSH port must be between 1 and 65535.");
+  }
+
+  const identityFile =
+    typeof value.identityFile === "string" ? value.identityFile.trim() || undefined : undefined;
+  return {
+    transportType: "ssh",
+    host,
+    ...(sshPort !== undefined ? { sshPort } : {}),
+    ...(identityFile ? { identityFile } : {}),
+  };
+}
+
+export function buildSshArgs(target: SshTransportTarget): string[] {
+  const args = [
+    "-T",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "ExitOnForwardFailure=yes",
+  ];
+  if (target.sshPort !== undefined) {
+    args.push("-p", String(target.sshPort));
+  }
+  if (target.identityFile) {
+    args.push("-i", target.identityFile);
+  }
+  args.push("-W", REMOTE_DAEMON_ENDPOINT, target.host);
+  return args;
+}
+
+function formatSshFailure(
+  stderr: string,
+  code: number | null,
+  signal: NodeJS.Signals | null,
+): string {
+  const detail = stderr.trim();
+  if (detail) return detail;
+  if (signal) return `ssh exited with signal ${signal}`;
+  return `ssh exited with code ${code ?? "unknown"}`;
+}
+
+function createSshProxy(target: SshTransportTarget): Promise<TransportEndpoint> {
+  let server: Server | null = null;
+  let socket: Socket | null = null;
+  let child: ChildProcessWithoutNullStreams | null = null;
+  let stderr = "";
+  let failure: string | null = null;
+
+  function close(): void {
+    server?.close();
+    server = null;
+    socket?.destroy();
+    socket = null;
+    if (child && !child.killed) {
+      child.kill();
+    }
+    child = null;
+  }
+
+  return new Promise((resolve, reject) => {
+    server = createServer((acceptedSocket) => {
+      socket = acceptedSocket;
+      server?.close();
+      server = null;
+
+      child = spawn("ssh", buildSshArgs(target), {
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      });
+      child.stderr.on("data", (chunk: Buffer | string) => {
+        stderr = `${stderr}${chunk.toString()}`.slice(-SSH_STDERR_LIMIT);
+      });
+      child.on("error", (error) => {
+        failure = error.message;
+        acceptedSocket.destroy(error);
+      });
+      child.on("exit", (code, signal) => {
+        if (code !== 0 || signal) {
+          failure = formatSshFailure(stderr, code, signal);
+        }
+        acceptedSocket.destroy(failure ? new Error(failure) : undefined);
+      });
+
+      acceptedSocket.on("error", () => undefined);
+      acceptedSocket.on("close", () => {
+        if (child && !child.killed) {
+          child.kill();
+        }
+      });
+      acceptedSocket.pipe(child.stdin);
+      child.stdout.pipe(acceptedSocket);
+    });
+    server.once("error", (error) => {
+      close();
+      reject(error);
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const address = server?.address();
+      if (!address || typeof address === "string") {
+        close();
+        reject(new Error("Failed to allocate the Remote SSH proxy port."));
+        return;
+      }
+      resolve({
+        url: `ws://127.0.0.1:${address.port}${WS_ENDPOINT_PATH}`,
+        close,
+        failureDetail: () => failure,
+      });
+    });
+  });
+}
+
+async function resolveTransportEndpoint(target: TransportTarget): Promise<TransportEndpoint> {
+  if (target.transportType === "ssh") {
+    return createSshProxy(target);
+  }
+  return {
+    url: buildLocalWebSocketUrl(target),
+    close: () => undefined,
+    failureDetail: () => null,
+  };
 }
 
 function decodeTransportMessage(input: { text?: string; binaryBase64?: string }): string | Buffer {
@@ -64,16 +249,18 @@ function decodeTransportMessage(input: { text?: string; binaryBase64?: string })
   throw new Error("Local transport send requires text or binary payload.");
 }
 
-export function openLocalTransportSession(target: TransportTarget): Promise<string> {
+export async function openLocalTransportSession(rawTarget: unknown): Promise<string> {
+  const target = parseTransportTarget(rawTarget);
   const sessionId = `local-session-${++nextSessionId}`;
-  const url = buildLocalWebSocketUrl(target);
+  const endpoint = await resolveTransportEndpoint(target);
 
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(endpoint.url);
     const session: Session = {
       id: sessionId,
       ws,
       state: "opening",
+      closeTarget: endpoint.close,
     };
     sessions.set(sessionId, session);
 
@@ -87,6 +274,7 @@ export function openLocalTransportSession(target: TransportTarget): Promise<stri
       openSettled = true;
       session.state = "closed";
       sessions.delete(sessionId);
+      endpoint.close();
       reject(new Error(message));
     };
 
@@ -119,6 +307,7 @@ export function openLocalTransportSession(target: TransportTarget): Promise<stri
       const shouldEmitClose = session.state === "open" || session.state === "closing";
       session.state = "closed";
       sessions.delete(sessionId);
+      endpoint.close();
 
       if (!openSettled) {
         finalizeOpenFailure(
@@ -138,17 +327,17 @@ export function openLocalTransportSession(target: TransportTarget): Promise<stri
     });
 
     ws.on("error", (err: Error) => {
+      const failureDetail = endpoint.failureDetail();
+      const detail = failureDetail ? `${err.message}: ${failureDetail}` : err.message;
       if (!openSettled) {
-        finalizeOpenFailure(
-          `Failed to connect to ${describeTransportTarget(target)}: ${err.message}`,
-        );
+        finalizeOpenFailure(`Failed to connect to ${describeTransportTarget(target)}: ${detail}`);
         return;
       }
 
       emitTransportEvent({
         sessionId,
         kind: "error",
-        error: err.message,
+        error: detail,
       });
     });
   });
@@ -199,6 +388,7 @@ export function closeLocalTransportSession(sessionId: string): void {
   } catch {
     // ignore close errors
   }
+  session.closeTarget();
   sessions.delete(sessionId);
 }
 
