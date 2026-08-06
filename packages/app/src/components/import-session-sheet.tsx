@@ -44,6 +44,7 @@ import {
   type ProviderErrorRow,
   resolveImportTarget,
   resolveProvidersToFetch,
+  resolveSessionsListScope,
   requiresImportSessionsHostUpgrade,
   sumFilteredAlreadyImportedCount,
 } from "@/components/import-session-sheet-view-model";
@@ -77,21 +78,26 @@ type RecentSessionsResponse = Awaited<
   ReturnType<RecentProviderSessionsClient["fetchRecentProviderSessions"]>
 >;
 
-type SessionsQueryKey = ReadonlyArray<string | number | null>;
+type SessionsQueryKey = ReadonlyArray<string | number | boolean | null>;
 
-function buildSessionsQueryRoot(serverId: string | null, cwd: string | null) {
-  return ["recent-provider-sessions", serverId, cwd] as const;
+function buildSessionsQueryRoot(
+  serverId: string | null,
+  cwd: string | null,
+  includeLinkedWorktrees: boolean,
+) {
+  return ["recent-provider-sessions", serverId, cwd, includeLinkedWorktrees] as const;
 }
 
 function buildSessionsQueryKey(input: {
   serverId: string | null;
   cwd: string | null;
+  includeLinkedWorktrees: boolean;
   query: string;
   limit: number;
   provider?: string;
 }): SessionsQueryKey {
   return [
-    ...buildSessionsQueryRoot(input.serverId, input.cwd),
+    ...buildSessionsQueryRoot(input.serverId, input.cwd, input.includeLinkedWorktrees),
     input.query,
     input.limit,
     ...(input.provider === undefined ? [] : [input.provider]),
@@ -117,17 +123,35 @@ function buildSessionsQueriesConfig(args: {
   client: RecentProviderSessionsClient | null;
   serverId: string | null;
   cwd: string | null;
+  includeLinkedWorktrees: boolean;
   query: string;
   limit: number;
   hostDisconnectedMessage?: string;
 }): SessionsQueryConfig[] {
-  const { queryClient, providersToFetch, visible, client, serverId, cwd, query, limit } = args;
-  const { hostDisconnectedMessage } = args;
+  const {
+    queryClient,
+    providersToFetch,
+    visible,
+    client,
+    serverId,
+    cwd,
+    includeLinkedWorktrees,
+    query,
+    limit,
+    hostDisconnectedMessage,
+  } = args;
   if (providersToFetch === null) return [];
   const enabled = visible && Boolean(client);
   const previousLimit = previousPageLimit(limit);
   return providersToFetch.map((provider) => ({
-    queryKey: buildSessionsQueryKey({ serverId, cwd, query, limit, provider }),
+    queryKey: buildSessionsQueryKey({
+      serverId,
+      cwd,
+      includeLinkedWorktrees,
+      query,
+      limit,
+      provider,
+    }),
     enabled,
     retry: false as const,
     // An import can invalidate an inactive host. Refresh its listing when observed again.
@@ -139,7 +163,14 @@ function buildSessionsQueriesConfig(args: {
       previousLimit === null
         ? undefined
         : queryClient.getQueryData<RecentSessionsResponse>(
-            buildSessionsQueryKey({ serverId, cwd, query, limit: previousLimit, provider }),
+            buildSessionsQueryKey({
+              serverId,
+              cwd,
+              includeLinkedWorktrees,
+              query,
+              limit: previousLimit,
+              provider,
+            }),
           ),
     queryFn: async () => {
       if (!client) {
@@ -147,6 +178,7 @@ function buildSessionsQueriesConfig(args: {
       }
       return await client.fetchRecentProviderSessions({
         ...(cwd ? { cwd } : {}),
+        ...(includeLinkedWorktrees ? { includeLinkedWorktrees: true } : {}),
         providers: [provider],
         limit,
         ...(query ? { query } : {}),
@@ -529,9 +561,13 @@ export function ImportSessionSheet({
     enabled: visible,
   });
   const supportsWorkspaceTarget = useHostFeature(serverId, "importSessionWorkspaceTarget");
+  const supportsLinkedWorktrees = useHostFeature(serverId, "importSessionLinkedWorktrees");
+  const usesLinkedWorktreeScope = Boolean(cwd && !workspaceId);
   const requiresHostUpgrade = requiresImportSessionsHostUpgrade({
     supportsSnapshot,
     workspaceId,
+    usesLinkedWorktreeScope,
+    supportsLinkedWorktrees,
     supportsWorkspaceTarget,
   });
 
@@ -545,9 +581,13 @@ export function ImportSessionSheet({
     [snapshotEntries],
   );
 
+  const { includeLinkedWorktrees, showRowFolders } = resolveSessionsListScope(
+    scopeCwd,
+    workspaceId,
+  );
   const sessionsQueryRoot = useMemo(
-    () => buildSessionsQueryRoot(serverId, scopeCwd),
-    [serverId, scopeCwd],
+    () => buildSessionsQueryRoot(serverId, scopeCwd, includeLinkedWorktrees),
+    [serverId, scopeCwd, includeLinkedWorktrees],
   );
 
   const queriesConfig = useMemo(
@@ -559,11 +599,23 @@ export function ImportSessionSheet({
         client,
         serverId,
         cwd: scopeCwd,
+        includeLinkedWorktrees,
         query,
         limit: pageLimit,
         hostDisconnectedMessage: t("workspace.terminal.hostDisconnected"),
       }),
-    [queryClient, providersToFetch, visible, client, serverId, scopeCwd, query, pageLimit, t],
+    [
+      queryClient,
+      providersToFetch,
+      visible,
+      client,
+      serverId,
+      scopeCwd,
+      includeLinkedWorktrees,
+      query,
+      pageLimit,
+      t,
+    ],
   );
 
   const queries = useQueries({ queries: queriesConfig });
@@ -603,8 +655,6 @@ export function ImportSessionSheet({
     [hostProjects],
   );
 
-  // A scoped sheet only lists one directory, so naming it on every row is noise.
-  const showRowFolders = scopeCwd === null;
   const resolveFolder = useCallback(
     (entry: FetchRecentProviderSessionEntry) =>
       showRowFolders
@@ -701,6 +751,7 @@ export function ImportSessionSheet({
         providerHandleId: entry.providerHandleId,
         cwd: entry.cwd,
         ...(target.workspaceId ? { workspaceId: target.workspaceId } : {}),
+        ...(usesLinkedWorktreeScope && cwd ? { sourceCwd: cwd } : {}),
       });
       // A pending import keeps the listing and navigation from the host it was sent to.
       void queryClient.invalidateQueries({
@@ -746,13 +797,14 @@ export function ImportSessionSheet({
         queryKey: buildSessionsQueryKey({
           serverId,
           cwd: scopeCwd,
+          includeLinkedWorktrees,
           query,
           limit: pageLimit,
           provider,
         }),
       });
     },
-    [pageLimit, query, queryClient, scopeCwd, serverId],
+    [includeLinkedWorktrees, pageLimit, query, queryClient, scopeCwd, serverId],
   );
 
   const handleShowAll = useCallback(() => setIsShowingAllDirectories(true), []);
