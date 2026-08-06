@@ -1143,6 +1143,7 @@ export interface GitWorktreeEntry {
   path: string;
   branchRef?: string;
   isBare?: boolean;
+  isPrunable?: boolean;
 }
 
 /** Check whether a path is under Paseo's worktree root. */
@@ -1190,6 +1191,9 @@ export function parseWorktreeList(output: string): GitWorktreeEntry[] {
     }
     if (current && trimmed === "bare") {
       current.isBare = true;
+    }
+    if (current && (trimmed === "prunable" || trimmed.startsWith("prunable "))) {
+      current.isPrunable = true;
     }
   }
   if (current) {
