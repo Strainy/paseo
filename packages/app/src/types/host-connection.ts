@@ -27,6 +27,14 @@ export interface DirectPipeHostConnection {
   path: string;
 }
 
+export interface RemoteSshHostConnection {
+  id: string;
+  type: "remoteSsh";
+  host: string;
+  sshPort?: number;
+  identityFile?: string;
+}
+
 export interface RelayHostConnection {
   id: string;
   type: "relay";
@@ -39,6 +47,7 @@ export type HostConnection =
   | DirectTcpHostConnection
   | DirectSocketHostConnection
   | DirectPipeHostConnection
+  | RemoteSshHostConnection
   | RelayHostConnection;
 
 export type HostLifecycle = Record<string, never>;
@@ -123,6 +132,9 @@ function hostConnectionEquals(left: HostConnection, right: HostConnection): bool
   if (left.type === "directPipe" && right.type === "directPipe") {
     return left.path === right.path;
   }
+  if (left.type === "remoteSsh" && right.type === "remoteSsh") {
+    return remoteSshConnectionEquals(left, right);
+  }
   if (left.type === "relay" && right.type === "relay") {
     return (
       left.relayEndpoint === right.relayEndpoint &&
@@ -132,6 +144,17 @@ function hostConnectionEquals(left: HostConnection, right: HostConnection): bool
   }
 
   return false;
+}
+
+function remoteSshConnectionEquals(
+  left: RemoteSshHostConnection,
+  right: RemoteSshHostConnection,
+): boolean {
+  return (
+    left.host === right.host &&
+    left.sshPort === right.sshPort &&
+    left.identityFile === right.identityFile
+  );
 }
 
 function hostLifecycleEquals(left: HostLifecycle, right: HostLifecycle): boolean {
@@ -294,6 +317,41 @@ export function connectionFromListen(listen: string): HostConnection | null {
   }
 }
 
+export function createRemoteSshHostConnection(input: {
+  host: string;
+  sshPort?: number;
+  identityFile?: string;
+}): RemoteSshHostConnection {
+  const host = input.host.trim();
+  if (!host) {
+    throw new Error("SSH host is required");
+  }
+  if (/\s/.test(host) || host.startsWith("-")) {
+    throw new Error("SSH host is invalid");
+  }
+
+  const sshPort = input.sshPort;
+  if (sshPort !== undefined && (!Number.isInteger(sshPort) || sshPort < 1 || sshPort > 65535)) {
+    throw new Error("SSH port must be between 1 and 65535");
+  }
+
+  const identityFile = input.identityFile?.trim() || undefined;
+  const id = [
+    "ssh",
+    encodeURIComponent(host),
+    sshPort === undefined ? "" : String(sshPort),
+    encodeURIComponent(identityFile ?? ""),
+  ].join(":");
+
+  return {
+    id,
+    type: "remoteSsh",
+    host,
+    ...(sshPort !== undefined ? { sshPort } : {}),
+    ...(identityFile ? { identityFile } : {}),
+  };
+}
+
 const StoredHostConnectionSchema = z.discriminatedUnion("type", [
   z.strictObject({
     id: z.string().optional(),
@@ -311,6 +369,13 @@ const StoredHostConnectionSchema = z.discriminatedUnion("type", [
     id: z.string().optional(),
     type: z.literal("directPipe"),
     path: z.string(),
+  }),
+  z.strictObject({
+    id: z.string().optional(),
+    type: z.literal("remoteSsh"),
+    host: z.string(),
+    sshPort: z.number().optional(),
+    identityFile: z.string().optional(),
   }),
   z.strictObject({
     id: z.string().optional(),
@@ -355,6 +420,17 @@ function normalizeStoredConnection(connection: StoredHostConnection): HostConnec
   if (connection.type === "directPipe") {
     const path = connection.path.trim();
     return path ? { id: `pipe:${path}`, type: "directPipe", path } : null;
+  }
+  if (connection.type === "remoteSsh") {
+    try {
+      return createRemoteSshHostConnection({
+        host: connection.host,
+        ...(connection.sshPort !== undefined ? { sshPort: connection.sshPort } : {}),
+        ...(connection.identityFile !== undefined ? { identityFile: connection.identityFile } : {}),
+      });
+    } catch {
+      return null;
+    }
   }
   if (connection.type === "relay") {
     try {

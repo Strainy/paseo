@@ -1471,6 +1471,10 @@ export const ar: TranslationResources = {
         title: "اتصال مباشر",
         description: "الشبكة المحلية أو VPN.",
       },
+      remoteSsh: {
+        title: "SSH عن بُعد",
+        description: "الاتصال عبر عميل SSH لسطح المكتب.",
+      },
       scanQr: {
         title: "مسح رمز QR",
         description: "اتصال التتابع المشفر.",
@@ -1521,6 +1525,27 @@ export const ar: TranslationResources = {
         unableToConnect:
           "غير قادر على الاتصال. تحقق من المضيف /port ومن إمكانية الوصول إلى البرنامج الخفي.",
         details: "التفاصيل:{{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "SSH عن بُعد",
+      helper: "الاتصال بخادم Paseo يعمل على المضيف البعيد.",
+      fields: {
+        host: "المضيف",
+        port: "منفذ SSH",
+        identityFile: "مسار ملف الهوية",
+        optional: "اختياري",
+      },
+      actions: {
+        cancel: "إلغاء",
+        connect: "اتصال",
+        connecting: "جارٍ الاتصال...",
+      },
+      errors: {
+        hostRequired: "المضيف مطلوب",
+        invalidHost: "أدخل مضيف SSH صالحًا",
+        invalidPort: "يجب أن يكون منفذ SSH بين 1 و65535",
+        failedToConnect: "تعذر الاتصال عبر SSH. {{detail}}",
       },
     },
     link: {
@@ -2167,6 +2192,7 @@ export const ar: TranslationResources = {
       badges: {
         relay: "تتابع",
         local: "محلي",
+        remoteSsh: "SSH عن بُعد",
       },
       connections: {
         title: "اتصالات",

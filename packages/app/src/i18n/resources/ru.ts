@@ -1503,6 +1503,10 @@ export const ru: TranslationResources = {
         title: "Прямое подключение",
         description: "Локальная сеть или VPN.",
       },
+      remoteSsh: {
+        title: "Удалённый SSH",
+        description: "Подключение через SSH-клиент настольного приложения.",
+      },
       scanQr: {
         title: "Сканировать код QR",
         description: "Зашифрованное релейное соединение.",
@@ -1553,6 +1557,27 @@ export const ru: TranslationResources = {
         unableToConnect:
           "Не удалось подключиться. Проверьте хост /port и убедитесь, что демон доступен.",
         details: "Подробности:{{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "Удалённый SSH",
+      helper: "Подключитесь к демону Paseo на удалённом хосте.",
+      fields: {
+        host: "Хост",
+        port: "Порт SSH",
+        identityFile: "Путь к файлу ключа",
+        optional: "Необязательно",
+      },
+      actions: {
+        cancel: "Отмена",
+        connect: "Подключить",
+        connecting: "Подключение...",
+      },
+      errors: {
+        hostRequired: "Укажите хост",
+        invalidHost: "Укажите корректный SSH-хост",
+        invalidPort: "Порт SSH должен быть от 1 до 65535",
+        failedToConnect: "Не удалось подключиться по SSH. {{detail}}",
       },
     },
     link: {
@@ -2206,6 +2231,7 @@ export const ru: TranslationResources = {
       badges: {
         relay: "Реле",
         local: "Местный",
+        remoteSsh: "Удалённый SSH",
       },
       connections: {
         title: "Соединения",

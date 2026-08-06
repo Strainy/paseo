@@ -28,6 +28,7 @@ import { Alert as InlineAlert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ProfileDraft,
   TerminalProfileEditModal,
@@ -48,6 +49,7 @@ import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import {
   getHostRuntimeStore,
   isHostRuntimeConnected,
+  type HostRuntimeConnectionStatus,
   useHostMutations,
   useHostRuntimeClient,
   useHostRuntimeIsConnected,
@@ -110,6 +112,9 @@ function formatHostConnectionLabel(connection: HostConnection, t: TFunction): st
   if (connection.type === "directSocket" || connection.type === "directPipe") {
     return `${t("settings.host.badges.local")} (${connection.path})`;
   }
+  if (connection.type === "remoteSsh") {
+    return `${t("settings.host.badges.remoteSsh")} (${connection.host})`;
+  }
   return `TCP (${connection.endpoint})`;
 }
 
@@ -129,6 +134,12 @@ function formatActiveConnectionBadge(
     return {
       icon: <Monitor size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
       text: t("settings.host.badges.local"),
+    };
+  }
+  if (activeConnection.type === "remoteSsh") {
+    return {
+      icon: <Globe size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
+      text: t("settings.host.badges.remoteSsh"),
     };
   }
   return {
@@ -159,6 +170,47 @@ function HostNotFound() {
   );
 }
 
+function normalizeConnectionDetail(
+  status: HostRuntimeConnectionStatus,
+  error: string | null,
+): string | null {
+  const trimmed = error?.trim();
+  return status === "online" || !trimmed ? null : trimmed;
+}
+
+function ConnectionStatusPill({
+  label,
+  variant,
+  dotColor,
+  detail,
+}: {
+  label: string;
+  variant: StatusBadgeVariant;
+  dotColor: string;
+  detail: string | null;
+}) {
+  const dotStyle = useMemo(() => [styles.statusDot, { backgroundColor: dotColor }], [dotColor]);
+  const leading = useMemo(() => <View style={dotStyle} />, [dotStyle]);
+  const pill = (
+    <View testID="host-page-connection-status">
+      <StatusBadge label={label} variant={variant} leading={leading} />
+    </View>
+  );
+
+  if (!detail) return pill;
+
+  return (
+    <Tooltip delayDuration={250} enabledOnDesktop enabledOnMobile>
+      <TooltipTrigger accessibilityRole="button" accessibilityLabel={`${label}: ${detail}`}>
+        {pill}
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start" offset={8} maxWidth={420}>
+        <Text style={styles.statusTooltipText}>{detail}</Text>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function HostStatusBadges({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -168,6 +220,8 @@ function HostStatusBadges({ serverId }: { serverId: string }) {
   );
 
   const connectionStatus = snapshot?.connectionStatus ?? "connecting";
+  const lastError = snapshot?.lastError ?? snapshot?.client?.lastError ?? null;
+  const connectionDetail = normalizeConnectionDetail(connectionStatus, lastError);
   const activeConnection = snapshot?.activeConnection ?? null;
   const statusLabel = formatConnectionStatus(connectionStatus);
   const statusTone = getConnectionStatusTone(connectionStatus);
@@ -186,15 +240,14 @@ function HostStatusBadges({ serverId }: { serverId: string }) {
   const connectionBadge = formatActiveConnectionBadge(activeConnection, theme, t);
   const versionBadgeText = formatDaemonVersionBadge(daemonVersion);
 
-  const statusDotStyle = useMemo(
-    () => [styles.statusDot, { backgroundColor: statusDotColor }],
-    [statusDotColor],
-  );
-  const statusLeading = useMemo(() => <View style={statusDotStyle} />, [statusDotStyle]);
-
   return (
     <View style={styles.identityBadges} testID="host-page-identity">
-      <StatusBadge label={statusLabel} variant={statusVariant} leading={statusLeading} />
+      <ConnectionStatusPill
+        label={statusLabel}
+        variant={statusVariant}
+        dotColor={statusDotColor}
+        detail={connectionDetail}
+      />
       {connectionBadge ? (
         <View style={styles.badgePill}>
           {connectionBadge.icon}
@@ -1826,6 +1879,11 @@ const styles = StyleSheet.create((theme) => ({
     width: 6,
     height: 6,
     borderRadius: theme.borderRadius.full,
+  },
+  statusTooltipText: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    lineHeight: theme.fontSize.sm * 1.4,
   },
   badgePill: {
     flexDirection: "row",

@@ -2,13 +2,13 @@ import type {
   DaemonTransport,
   DaemonTransportFactory,
 } from "@getpaseo/client/internal/daemon-client";
-import type { LocalTransportTarget } from "./desktop-daemon";
+import type { DesktopDaemonTransportTarget } from "./desktop-daemon";
 import {
   defaultLocalDaemonTransportRpc,
   type LocalDaemonTransportRpc,
 } from "./local-daemon-transport-rpc";
 
-const LOCAL_TRANSPORT_SCHEME = "paseo+local:";
+const DESKTOP_TRANSPORT_SCHEME = "paseo+desktop:";
 
 function encodeBinaryToBase64(data: Uint8Array | ArrayBuffer): string {
   const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
@@ -28,21 +28,49 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
-export function buildLocalDaemonTransportUrl(target: LocalTransportTarget): string {
-  const url = new URL(`${LOCAL_TRANSPORT_SCHEME}//${target.transportType}`);
-  url.searchParams.set("path", target.transportPath);
+export function buildDesktopDaemonTransportUrl(target: DesktopDaemonTransportTarget): string {
+  const url = new URL(`${DESKTOP_TRANSPORT_SCHEME}//${target.transportType}`);
+  if (target.transportType === "ssh") {
+    url.searchParams.set("host", target.host);
+    if (target.sshPort !== undefined) {
+      url.searchParams.set("port", String(target.sshPort));
+    }
+    if (target.identityFile) {
+      url.searchParams.set("identity", target.identityFile);
+    }
+  } else {
+    url.searchParams.set("path", target.transportPath);
+  }
   return url.toString();
 }
 
-function parseLocalDaemonTransportUrl(url: string): LocalTransportTarget {
+function parseDesktopDaemonTransportUrl(url: string): DesktopDaemonTransportTarget {
   const parsed = new URL(url);
-  if (parsed.protocol !== LOCAL_TRANSPORT_SCHEME) {
-    throw new Error(`Unsupported local transport URL: ${url}`);
+  if (parsed.protocol !== DESKTOP_TRANSPORT_SCHEME) {
+    throw new Error(`Unsupported desktop transport URL: ${url}`);
   }
   const transportType = parsed.hostname;
+  if (transportType === "ssh") {
+    const host = parsed.searchParams.get("host")?.trim() ?? "";
+    const rawPort = parsed.searchParams.get("port");
+    const sshPort = rawPort === null ? undefined : Number(rawPort);
+    const identityFile = parsed.searchParams.get("identity")?.trim() || undefined;
+    if (!host) {
+      throw new Error(`Invalid SSH transport target: ${url}`);
+    }
+    if (sshPort !== undefined && (!Number.isInteger(sshPort) || sshPort < 1 || sshPort > 65535)) {
+      throw new Error(`Invalid SSH transport target: ${url}`);
+    }
+    return {
+      transportType,
+      host,
+      ...(sshPort !== undefined ? { sshPort } : {}),
+      ...(identityFile ? { identityFile } : {}),
+    };
+  }
   const transportPath = parsed.searchParams.get("path")?.trim() ?? "";
   if ((transportType !== "socket" && transportType !== "pipe") || !transportPath) {
-    throw new Error(`Invalid local transport target: ${url}`);
+    throw new Error(`Invalid desktop transport target: ${url}`);
   }
   return {
     transportType,
@@ -50,11 +78,11 @@ function parseLocalDaemonTransportUrl(url: string): LocalTransportTarget {
   };
 }
 
-export function createDesktopLocalDaemonTransportFactory(
+export function createDesktopDaemonTransportFactory(
   rpc: LocalDaemonTransportRpc = defaultLocalDaemonTransportRpc,
 ): DaemonTransportFactory | null {
   return ({ url }) => {
-    const target = parseLocalDaemonTransportUrl(url);
+    const target = parseDesktopDaemonTransportUrl(url);
     let sessionId: string | null = null;
     let unlisten: (() => void) | null = null;
     let disposed = false;
