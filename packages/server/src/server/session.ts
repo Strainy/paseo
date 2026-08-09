@@ -2191,6 +2191,12 @@ export class Session {
         return this.handleWorkspaceLabelsSetRequest(msg.workspaceId, msg.labels, msg.requestId);
       case "workspace.labels.delete.request":
         return this.handleWorkspaceLabelDeleteRequest(msg.label, msg.requestId);
+      case "workspace.base_branch.set.request":
+        return this.handleWorkspaceBaseBranchSetRequest(
+          msg.workspaceId,
+          msg.baseBranch,
+          msg.requestId,
+        );
       case "workspace.pin.set.request":
         return this.handleWorkspacePinSetRequest(msg.workspaceId, msg.pinned, msg.requestId);
       default:
@@ -3074,6 +3080,93 @@ export class Session {
         "session: workspace.labels.delete.request error",
       );
       emitResponse(false, [], getErrorMessageOr(error, "Failed to delete workspace label"));
+    }
+  }
+
+  private async handleWorkspaceBaseBranchSetRequest(
+    workspaceId: string,
+    baseBranch: string | null,
+    requestId: string,
+  ): Promise<void> {
+    const emitResponse = (
+      accepted: boolean,
+      effectiveBaseBranch: string | null,
+      baseBranchOverride: string | null,
+      error: string | null,
+    ) => {
+      this.emit({
+        type: "workspace.base_branch.set.response",
+        payload: {
+          requestId,
+          workspaceId,
+          accepted,
+          baseBranch: effectiveBaseBranch,
+          baseBranchOverride,
+          error,
+        },
+      });
+    };
+
+    try {
+      const workspace = await this.workspaceRegistry.get(workspaceId);
+      if (!workspace) {
+        emitResponse(false, null, null, "Workspace not found");
+        return;
+      }
+      if (workspace.kind === "directory") {
+        emitResponse(false, null, null, "Workspace is not a Git checkout");
+        return;
+      }
+
+      const requestedBaseBranch = baseBranch?.trim() ?? "";
+      let nextOverride: string | null = null;
+      let effectiveBaseBranch: string;
+      if (requestedBaseBranch) {
+        const resolution = await this.workspaceGitService.validateBranchRef(
+          workspace.cwd,
+          requestedBaseBranch,
+        );
+        if (resolution.kind === "not-found") {
+          emitResponse(
+            false,
+            await this.resolveWorkspaceComparisonBaseBranch(workspace),
+            workspace.comparisonBaseBranch ?? null,
+            `Base branch not found: ${requestedBaseBranch}`,
+          );
+          return;
+        }
+        nextOverride = resolution.name;
+        effectiveBaseBranch = resolution.name;
+      } else {
+        effectiveBaseBranch = await this.workspaceGitService.resolveDefaultBranch(workspace.cwd, {
+          force: true,
+          reason: "workspace base branch reset",
+        });
+      }
+
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        comparisonBaseBranch: nextOverride,
+        updatedAt: new Date().toISOString(),
+      }));
+      if (!updated) {
+        emitResponse(false, null, null, "Workspace not found");
+        return;
+      }
+
+      emitResponse(true, effectiveBaseBranch, nextOverride, null);
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error, workspaceId, requestId },
+        "session: workspace.base_branch.set.request error",
+      );
+      emitResponse(
+        false,
+        null,
+        null,
+        getErrorMessageOr(error, "Failed to set workspace base branch"),
+      );
     }
   }
 
@@ -4540,6 +4633,7 @@ export class Session {
       workspace.isPaseoOwnedWorktree && workspace.worktreeRoot
         ? basename(workspace.worktreeRoot)
         : undefined;
+    const baseBranch = await this.resolveWorkspaceComparisonBaseBranch(workspace);
 
     return {
       id: workspace.workspaceId,
@@ -4557,6 +4651,8 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       labels: workspace.labels,
+      baseBranch,
+      baseBranchOverride: workspace.comparisonBaseBranch ?? null,
       pinnedAt: workspace.pinnedAt,
       archivingAt: null,
       status: "done",
@@ -4570,6 +4666,26 @@ export class Session {
           }
         : {}),
     };
+  }
+
+  private async resolveWorkspaceComparisonBaseBranch(
+    workspace: PersistedWorkspaceRecord,
+  ): Promise<string | null> {
+    if (workspace.kind === "directory") {
+      return null;
+    }
+    if (workspace.comparisonBaseBranch) {
+      return workspace.comparisonBaseBranch;
+    }
+    try {
+      return await this.workspaceGitService.resolveDefaultBranch(workspace.cwd);
+    } catch (error) {
+      this.sessionLogger.warn(
+        { err: error, workspaceId: workspace.workspaceId, cwd: workspace.cwd },
+        "Unable to resolve workspace comparison base branch",
+      );
+      return null;
+    }
   }
 
   private buildWorkspaceGitRuntimePayload(
@@ -4630,6 +4746,7 @@ export class Session {
     result: CreatePaseoWorktreeResult,
   ): Promise<WorkspaceDescriptorPayload> {
     const projectRecord = await this.projectRegistry.get(result.workspace.projectId);
+    const baseBranch = await this.resolveWorkspaceComparisonBaseBranch(result.workspace);
     return {
       id: result.workspace.workspaceId,
       projectId: result.workspace.projectId,
@@ -4649,6 +4766,8 @@ export class Session {
       }),
       title: result.workspace.title,
       labels: result.workspace.labels,
+      baseBranch,
+      baseBranchOverride: result.workspace.comparisonBaseBranch ?? null,
       pinnedAt: result.workspace.pinnedAt,
       archivingAt: null,
       status: "done",

@@ -828,6 +828,16 @@ export const ja: TranslationResources = {
         committed: "コミット済み",
         branchUnknown: "不明",
         base: "ベース",
+        baseBranch: {
+          label: "ベースブランチ",
+          repositoryDefault: "リポジトリのデフォルト",
+          searchPlaceholder: "ブランチを検索",
+          noMatches: "一致するブランチがありません",
+          loadingBranches: "ブランチを読み込み中…",
+          saving: "保存中…",
+          loadFailed: "ブランチを読み込めませんでした",
+          saveFailed: "ベースブランチを保存できませんでした",
+        },
         newFile: "新規",
         deletedFile: "削除済み",
         commits: {

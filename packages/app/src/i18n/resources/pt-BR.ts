@@ -839,6 +839,16 @@ export const ptBR: TranslationResources = {
         committed: "Com commit",
         branchUnknown: "Desconhecido",
         base: "base",
+        baseBranch: {
+          label: "Branch base",
+          repositoryDefault: "Padrão do repositório",
+          searchPlaceholder: "Buscar branches",
+          noMatches: "Nenhuma branch correspondente",
+          loadingBranches: "Carregando branches…",
+          saving: "Salvando…",
+          loadFailed: "Falha ao carregar branches",
+          saveFailed: "Falha ao salvar a branch base",
+        },
         newFile: "Novo",
         deletedFile: "Excluído",
         commits: {

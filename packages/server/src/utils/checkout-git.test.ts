@@ -3463,7 +3463,8 @@ const x = 1;
     expect(baseDiff.diff).not.toContain("file.txt");
   });
 
-  it("names both refs when a requested base ref does not match the stored one", async () => {
+  it("uses an explicit comparison branch instead of the worktree creation base", async () => {
+    execFileSync("git", ["branch", "other"], { cwd: repoDir });
     const worktree = await createLegacyWorktreeForTest({
       branchName: "mismatch-feature",
       cwd: repoDir,
@@ -3472,9 +3473,18 @@ const x = 1;
       paseoHome,
     });
 
-    await expect(
-      getCheckoutDiff(worktree.worktreePath, { mode: "base", baseRef: "other" }, { paseoHome }),
-    ).rejects.toThrow("Base ref mismatch: stored refs/heads/main, requested other");
+    writeFileSync(join(worktree.worktreePath, "override.txt"), "override\n");
+    execFileSync("git", ["add", "override.txt"], { cwd: worktree.worktreePath });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "override"], {
+      cwd: worktree.worktreePath,
+    });
+
+    const result = await getCheckoutDiff(
+      worktree.worktreePath,
+      { mode: "base", baseRef: "other" },
+      { paseoHome },
+    );
+    expect(result.diff).toContain("override.txt");
   });
 
   it("excludes dirty working tree changes from Paseo worktree base diffs", async () => {
@@ -3523,7 +3533,26 @@ const x = 1;
       cwd: repoDir,
     });
 
-    await expect(resolveRepositoryDefaultBranch(repoDir)).resolves.toBe("main");
+    await expect(resolveRepositoryDefaultBranch(repoDir)).resolves.toBe("refs/remotes/origin/main");
+  });
+
+  it("uses the first configured remote when origin is unavailable", async () => {
+    execFileSync("git", ["checkout", "-b", "develop"], { cwd: repoDir });
+    execFileSync("git", ["remote", "add", "upstream", "https://github.com/acme/repo.git"], {
+      cwd: repoDir,
+    });
+    execFileSync("git", ["update-ref", "refs/remotes/upstream/develop", "refs/heads/develop"], {
+      cwd: repoDir,
+    });
+    execFileSync(
+      "git",
+      ["symbolic-ref", "refs/remotes/upstream/HEAD", "refs/remotes/upstream/develop"],
+      { cwd: repoDir },
+    );
+
+    await expect(resolveRepositoryDefaultBranch(repoDir)).resolves.toBe(
+      "refs/remotes/upstream/develop",
+    );
   });
 
   it("merges to stored baseRefName when baseRef is not provided", async () => {
