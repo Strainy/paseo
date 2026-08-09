@@ -852,6 +852,16 @@ export const zhCN: TranslationResources = {
         committed: "已 commit",
         branchUnknown: "未知",
         base: "base",
+        baseBranch: {
+          label: "基准分支",
+          repositoryDefault: "仓库默认分支",
+          searchPlaceholder: "搜索分支",
+          noMatches: "没有匹配的分支",
+          loadingBranches: "正在加载分支…",
+          saving: "正在保存…",
+          loadFailed: "无法加载分支",
+          saveFailed: "无法保存基准分支",
+        },
         newFile: "新增",
         deletedFile: "已删除",
         commits: {

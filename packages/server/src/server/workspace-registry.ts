@@ -75,6 +75,9 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  // User-selected comparison branch for committed diffs. Missing or null follows
+  // the repository default; this stays separate from the creation-time baseBranch.
+  comparisonBaseBranch: z.string().nullable().optional(),
   isPaseoOwnedWorktree: z.boolean().default(false),
   mainRepoRoot: z.string().nullable().default(null),
   createdAt: z.string(),
@@ -549,6 +552,7 @@ export function createPersistedWorkspaceRecord(input: {
   branch?: string | null;
   worktreeRoot?: string | null;
   baseBranch?: string | null;
+  comparisonBaseBranch?: string | null;
   isPaseoOwnedWorktree?: boolean;
   mainRepoRoot?: string | null;
   createdAt: string;
@@ -563,6 +567,9 @@ export function createPersistedWorkspaceRecord(input: {
     branch: input.branch ?? null,
     worktreeRoot: input.worktreeRoot ?? null,
     baseBranch: input.baseBranch ?? null,
+    ...(input.comparisonBaseBranch !== undefined
+      ? { comparisonBaseBranch: input.comparisonBaseBranch }
+      : {}),
     isPaseoOwnedWorktree: input.isPaseoOwnedWorktree ?? false,
     mainRepoRoot: input.mainRepoRoot ?? null,
     archivedAt: input.archivedAt ?? null,

@@ -8089,6 +8089,125 @@ test("workspace.title.set.request stores the title and emits an updated descript
   });
 });
 
+test("workspace base branch defaults to the repository default and accepts an override", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({
+      onMessage: (message) => emitted.push(message),
+      workspaceGitService: createNoopWorkspaceGitService({
+        resolveDefaultBranch: async () => "refs/remotes/origin/main",
+        validateBranchRef: async (_cwd, ref) =>
+          ref === "release" ? { kind: "local", name: "release" } : { kind: "not-found" },
+      }),
+    }),
+  );
+  const project = createPersistedProjectRecord({
+    projectId: "proj-1",
+    rootPath: REPO_CWD,
+    kind: "git",
+    displayName: "acme/repo",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: project.projectId,
+    cwd: REPO_CWD,
+    kind: "worktree",
+    displayName: "feature",
+    branch: "feature",
+    baseBranch: "feature-parent",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const projects = new Map([[project.projectId, project]]);
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.projectRegistry.get = async (id: string) => projects.get(id) ?? null;
+  session.projectRegistry.list = async () => Array.from(projects.values());
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.get = async (id: string) => workspaces.get(id) ?? null;
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+  session.workspaceUpdatesSubscription = {
+    subscriptionId: "sub-workspaces",
+    filter: {},
+    isBootstrapping: false,
+    lastEmittedByWorkspaceId: new Map(),
+    pendingUpdatesByWorkspaceId: new Map(),
+  };
+
+  await expect(session.describeWorkspaceRecord(workspace, project)).resolves.toMatchObject({
+    baseBranch: "refs/remotes/origin/main",
+    baseBranchOverride: null,
+  });
+
+  await session.handleMessage({
+    type: "workspace.base_branch.set.request",
+    workspaceId: workspace.workspaceId,
+    baseBranch: "release",
+    requestId: "req-base-1",
+  });
+
+  expect(findByType(emitted, "workspace.base_branch.set.response")?.payload).toEqual({
+    requestId: "req-base-1",
+    workspaceId: workspace.workspaceId,
+    accepted: true,
+    baseBranch: "release",
+    baseBranchOverride: "release",
+    error: null,
+  });
+  expect(workspaces.get(workspace.workspaceId)?.comparisonBaseBranch).toBe("release");
+  expect(findByType(emitted, "workspace_update")?.payload).toMatchObject({
+    kind: "upsert",
+    workspace: {
+      id: workspace.workspaceId,
+      baseBranch: "release",
+      baseBranchOverride: "release",
+    },
+  });
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.base_branch.set.request",
+    workspaceId: workspace.workspaceId,
+    baseBranch: "missing",
+    requestId: "req-base-missing",
+  });
+
+  expect(findByType(emitted, "workspace.base_branch.set.response")?.payload).toEqual({
+    requestId: "req-base-missing",
+    workspaceId: workspace.workspaceId,
+    accepted: false,
+    baseBranch: "release",
+    baseBranchOverride: "release",
+    error: "Base branch not found: missing",
+  });
+  expect(workspaces.get(workspace.workspaceId)?.comparisonBaseBranch).toBe("release");
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.base_branch.set.request",
+    workspaceId: workspace.workspaceId,
+    baseBranch: null,
+    requestId: "req-base-reset",
+  });
+
+  expect(findByType(emitted, "workspace.base_branch.set.response")?.payload).toEqual({
+    requestId: "req-base-reset",
+    workspaceId: workspace.workspaceId,
+    accepted: true,
+    baseBranch: "refs/remotes/origin/main",
+    baseBranchOverride: null,
+    error: null,
+  });
+  expect(workspaces.get(workspace.workspaceId)?.comparisonBaseBranch).toBeNull();
+});
+
 test("workspace.pin.set.request stores the pin timestamp and emits an updated descriptor", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = asTestSession(

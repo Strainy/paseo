@@ -867,6 +867,16 @@ export const ko: TranslationResources = {
         committed: "커밋됨",
         branchUnknown: "알 수 없음",
         base: "기준",
+        baseBranch: {
+          label: "기준 브랜치",
+          repositoryDefault: "저장소 기본값",
+          searchPlaceholder: "브랜치 검색",
+          noMatches: "일치하는 브랜치 없음",
+          loadingBranches: "브랜치 불러오는 중…",
+          saving: "저장 중…",
+          loadFailed: "브랜치를 불러오지 못했습니다",
+          saveFailed: "기준 브랜치를 저장하지 못했습니다",
+        },
         newFile: "신규",
         deletedFile: "삭제됨",
         commits: {

@@ -29,6 +29,11 @@ mutable placement facts, but never changes `projectId`, `cwd`, `displayName`, or
 Workspace archive runs lifecycle teardown from the exact `cwd` but removes only the backing
 `worktreeRoot` after its last active reference disappears. Worktree recovery recreates that backing
 checkout from `mainRepoRoot`, then restores the relative path from `worktreeRoot` to `cwd`.
+`baseBranch` remains a creation/recovery fact. `comparisonBaseBranch` is the independent user
+override for committed diffs; missing or null follows the repository default remote-tracking ref
+such as `origin/main`. Paseo prefers `origin`; when it is absent, it uses the first remote from
+`git remote -v`. It falls back to a local default branch only when the selected remote has no
+default ref.
 
 Paseo uses **file-based JSON persistence** instead of a traditional database. All data is validated at runtime with Zod schemas. Most stores write atomically (write to temp file, then rename); a few still use plain `writeFile` — see each section. There is no schema-versioning/migration framework — schemas rely on optional fields with defaults for forward compatibility, with a small amount of inline normalization in `persisted-config.ts` for legacy provider/speech entries.
 
@@ -406,6 +411,7 @@ Array of workspace records. A workspace is a specific working directory within a
 | `branch`                       | `string \| null`                                | The current Git branch for git-backed workspaces. Separate from `displayName`/`title`; a background branch refresh never rewrites the name.                                                   |
 | `worktreeRoot`                 | `string \| null`                                | Backing checkout/worktree root. May differ from `cwd` for exact subprojects and remains persisted after the worktree is deleted so restore can reproduce the placement.                       |
 | `baseBranch`                   | `string \| null`                                | Normalized branch the Paseo worktree was created from; null for directories, local checkouts, and checkout-branch worktrees                                                                   |
+| `comparisonBaseBranch`         | `string?` (nullable)                            | User-set committed-diff base override. Missing or null follows the selected remote's default tracking ref (for example, `origin/main`); it never changes worktree recovery placement.         |
 | `isPaseoOwnedWorktree`         | `boolean`                                       | Whether Paseo owns and may remove/recreate the backing `worktreeRoot`                                                                                                                         |
 | `mainRepoRoot`                 | `string \| null`                                | Main repository root for worktree checkouts, independent of both exact `cwd` and backing `worktreeRoot`                                                                                       |
 | `createdAt`                    | `string` (ISO 8601)                             |                                                                                                                                                                                               |
