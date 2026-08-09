@@ -102,8 +102,7 @@ function resolveBranchLabel(input: {
 
 function formatBaseRefLabel(baseRef: string | undefined, fallbackLabel: string): string {
   if (!baseRef) return fallbackLabel;
-  const trimmed = baseRef.replace(/^refs\/(heads|remotes)\//, "").trim();
-  return trimmed.startsWith("origin/") ? trimmed.slice("origin/".length) : trimmed;
+  return baseRef.replace(/^refs\/(heads|remotes)\//, "").trim();
 }
 
 type PrStatusValue = NonNullable<CheckoutPrStatusPayload["status"]> | null;

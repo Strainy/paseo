@@ -8,6 +8,7 @@ import {
   MenuSurface,
   MenuTrigger,
   useMenuContext,
+  type MenuPresentation,
   type MenuSurfaceProps,
   type MenuTriggerProps,
 } from "@/components/ui/menu";
@@ -38,4 +39,9 @@ export function DropdownMenuContent(props: MenuSurfaceProps): ReactElement | nul
 export function useDropdownMenuClose(): () => void {
   const { setOpen } = useMenuContext("useDropdownMenuClose");
   return useCallback(() => setOpen(false), [setOpen]);
+}
+
+/** Whether the menu is drawing as a popover or a bottom sheet, for content that must adapt. */
+export function useDropdownMenuPresentation(): MenuPresentation {
+  return useMenuContext("useDropdownMenuPresentation").presentation;
 }

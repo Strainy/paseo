@@ -910,6 +910,16 @@ export const fr: TranslationResources = {
         committed: "Engagé",
         branchUnknown: "Inconnu",
         base: "base",
+        baseBranch: {
+          label: "Branche de base",
+          repositoryDefault: "Valeur par défaut du dépôt",
+          searchPlaceholder: "Rechercher des branches",
+          noMatches: "Aucune branche correspondante",
+          loadingBranches: "Chargement des branches…",
+          saving: "Enregistrement…",
+          loadFailed: "Échec du chargement des branches",
+          saveFailed: "Échec de l’enregistrement de la branche de base",
+        },
         newFile: "Nouveau",
         deletedFile: "Supprimé",
         commits: {

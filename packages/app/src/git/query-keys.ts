@@ -35,8 +35,9 @@ export function checkoutPrStatusQueryKey(serverId: string, cwd: string) {
   return ["checkoutPrStatus", serverId, cwd] as const;
 }
 
-export function checkoutCommitsQueryKey(serverId: string, cwd: string) {
-  return ["checkoutCommits", serverId, cwd] as const;
+export function checkoutCommitsQueryKey(serverId: string, cwd: string, baseRef?: string) {
+  const checkoutKey = ["checkoutCommits", serverId, cwd] as const;
+  return baseRef ? ([...checkoutKey, baseRef] as const) : checkoutKey;
 }
 
 export function checkoutCommitFileDiffQueryKey(

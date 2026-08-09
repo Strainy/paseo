@@ -880,6 +880,16 @@ export const ar: TranslationResources = {
         committed: "ملتزم",
         branchUnknown: "مجهول",
         base: "قاعدة",
+        baseBranch: {
+          label: "الفرع الأساسي",
+          repositoryDefault: "الفرع الافتراضي للمستودع",
+          searchPlaceholder: "البحث في الفروع",
+          noMatches: "لا توجد فروع مطابقة",
+          loadingBranches: "جارٍ تحميل الفروع…",
+          saving: "جارٍ الحفظ…",
+          loadFailed: "فشل تحميل الفروع",
+          saveFailed: "فشل حفظ الفرع الأساسي",
+        },
         newFile: "جديد",
         deletedFile: "تم الحذف",
         commits: {

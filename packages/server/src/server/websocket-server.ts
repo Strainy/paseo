@@ -1716,6 +1716,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceLabels: true,
         // COMPAT(workspaceLabelDeletion): added in v0.3.0, remove after 2027-02-07.
         workspaceLabelDeletion: true,
+        // COMPAT(workspaceBaseBranch): added in v0.3.0, remove after 2027-02-07.
+        workspaceBaseBranch: true,
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: true,
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.

@@ -911,6 +911,16 @@ export const es: TranslationResources = {
         committed: "Comprometido",
         branchUnknown: "Desconocido",
         base: "base",
+        baseBranch: {
+          label: "Rama base",
+          repositoryDefault: "Predeterminada del repositorio",
+          searchPlaceholder: "Buscar ramas",
+          noMatches: "No hay ramas coincidentes",
+          loadingBranches: "Cargando ramas…",
+          saving: "Guardando…",
+          loadFailed: "No se pudieron cargar las ramas",
+          saveFailed: "No se pudo guardar la rama base",
+        },
         newFile: "Nuevo",
         deletedFile: "Eliminado",
         commits: {

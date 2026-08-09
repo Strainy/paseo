@@ -2633,6 +2633,29 @@ export class DaemonClient {
     return { updatedWorkspaceIds: payload.updatedWorkspaceIds };
   }
 
+  async setWorkspaceBaseBranch(
+    workspaceId: string,
+    baseBranch: string | null,
+    requestId?: string,
+  ): Promise<{ baseBranch: string | null; baseBranchOverride: string | null }> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.base_branch.set.response">({
+        requestId,
+        message: {
+          type: "workspace.base_branch.set.request",
+          workspaceId,
+          baseBranch,
+        },
+      });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceBaseBranch rejected");
+    }
+    return {
+      baseBranch: payload.baseBranch,
+      baseBranchOverride: payload.baseBranchOverride,
+    };
+  }
+
   async setWorkspacePinned(
     workspaceId: string,
     pinned: boolean,
@@ -3800,14 +3823,17 @@ export class DaemonClient {
 
   async listCheckoutCommits(
     cwd: string,
-    requestId?: string,
+    options?: { baseRef?: string; requestId?: string } | string,
   ): Promise<{ baseRef: string | null; commits: CheckoutCommit[] }> {
+    const requestId = typeof options === "string" ? options : options?.requestId;
+    const baseRef = typeof options === "string" ? undefined : options?.baseRef;
     const payload =
       await this.sendNamespacedCorrelatedSessionRequest<"checkout.commits.list.response">({
         requestId,
         message: {
           type: "checkout.commits.list.request",
           cwd,
+          ...(baseRef ? { baseRef } : {}),
         },
         timeout: 60000,
       });

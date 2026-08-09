@@ -889,6 +889,16 @@ export const en = {
         committed: "Committed",
         branchUnknown: "Unknown",
         base: "base",
+        baseBranch: {
+          label: "Base branch",
+          repositoryDefault: "Repository default",
+          searchPlaceholder: "Search branches",
+          noMatches: "No matching branches",
+          loadingBranches: "Loading branches…",
+          saving: "Saving…",
+          loadFailed: "Failed to load branches",
+          saveFailed: "Failed to save base branch",
+        },
         newFile: "New",
         deletedFile: "Deleted",
         commits: {

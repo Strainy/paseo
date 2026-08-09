@@ -174,6 +174,7 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
   it("invalidates recent commits when checkout status is pushed", () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd), { commits: [] });
+    queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd, "main"), { commits: [] });
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, "/repo2"), { commits: [] });
 
     applyCheckoutStatusUpdateFromEvent({
@@ -185,6 +186,9 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     expect(queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd))?.isInvalidated).toBe(
       true,
     );
+    expect(
+      queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd, "main"))?.isInvalidated,
+    ).toBe(true);
     expect(
       queryClient.getQueryState(checkoutCommitsQueryKey(serverId, "/repo2"))?.isInvalidated,
     ).toBe(false);

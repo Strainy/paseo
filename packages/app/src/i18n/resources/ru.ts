@@ -902,6 +902,16 @@ export const ru: TranslationResources = {
         committed: "Преданный идее",
         branchUnknown: "Неизвестный",
         base: "база",
+        baseBranch: {
+          label: "Базовая ветка",
+          repositoryDefault: "По умолчанию в репозитории",
+          searchPlaceholder: "Поиск веток",
+          noMatches: "Нет подходящих веток",
+          loadingBranches: "Загрузка веток…",
+          saving: "Сохранение…",
+          loadFailed: "Не удалось загрузить ветки",
+          saveFailed: "Не удалось сохранить базовую ветку",
+        },
         newFile: "Новый",
         deletedFile: "Удалено",
         commits: {

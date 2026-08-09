@@ -118,6 +118,8 @@ export interface WorkspaceDescriptor {
   name: string;
   title?: string | null;
   labels?: string[];
+  baseBranch?: string | null;
+  baseBranchOverride?: string | null;
   pinnedAt?: string | null;
   status: WorkspaceDescriptorPayload["status"];
   statusEnteredAt: Date | null;
@@ -155,6 +157,8 @@ export function normalizeWorkspaceDescriptor(
     name: payload.name,
     title: payload.title ?? null,
     labels: payload.labels ?? [],
+    baseBranch: payload.baseBranch,
+    baseBranchOverride: payload.baseBranchOverride,
     pinnedAt: payload.pinnedAt ?? null,
     status: payload.status,
     statusEnteredAt,
