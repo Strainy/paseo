@@ -48,6 +48,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import * as Clipboard from "expo-clipboard";
@@ -76,6 +77,12 @@ import { isWeb } from "@/constants/platform";
 import { usePublishWorkingDiffAttachment, useWorkingDiff } from "@/git/use-working-diff";
 import { DiffTooLargeState } from "@/git/diff-too-large-state";
 import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
+import {
+  formatWorkspaceBaseBranchLabel,
+  useWorkspaceBaseBranchControl,
+  WorkspaceBaseBranchMenuPage,
+  type WorkspaceBaseBranchMenuConfig,
+} from "@/git/workspace-base-branch-menu";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -262,10 +269,16 @@ function resolveChangesFilePress(
   return host === "explorer" ? onChangesFilePress : undefined;
 }
 
+/** Caps the diff mode popover so a long branch list scrolls instead of overflowing the screen. */
+const BASE_BRANCH_MENU_MAX_HEIGHT = 360;
+
 interface DiffModeMenuProps {
   diffMode: "uncommitted" | "base";
   committedDescription?: string;
+  baseBranchMenu?: WorkspaceBaseBranchMenuConfig;
+  open?: boolean;
   testIDPrefix?: string;
+  onOpenChange?: (open: boolean) => void;
   onSelectUncommitted: () => void;
   onSelectBase: () => void;
 }
@@ -273,7 +286,10 @@ interface DiffModeMenuProps {
 export function DiffModeMenu({
   diffMode,
   committedDescription,
+  baseBranchMenu,
+  open,
   testIDPrefix = "changes-diff",
+  onOpenChange,
   onSelectUncommitted,
   onSelectBase,
 }: DiffModeMenuProps) {
@@ -281,8 +297,21 @@ export function DiffModeMenu({
   const triggerStyle = useMemo(() => buildDiffModeTriggerStyle(), []);
   const uncommittedLabel = t("workspace.git.diff.uncommitted");
   const committedLabel = t("workspace.git.diff.committed");
+  const baseBranchPages = useMemo(
+    () =>
+      baseBranchMenu
+        ? [
+            {
+              id: "baseBranch",
+              title: t("workspace.git.diff.baseBranch.label"),
+              content: <WorkspaceBaseBranchMenuPage config={baseBranchMenu} />,
+            },
+          ]
+        : undefined,
+    [baseBranchMenu, t],
+  );
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
         testID={`${testIDPrefix}-status-trigger`}
         style={triggerStyle}
@@ -294,7 +323,17 @@ export function DiffModeMenu({
         </Text>
         <ThemedChevronDown size={12} uniProps={foregroundMutedIconColorMapping} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" width={260} testID={`${testIDPrefix}-status-menu`}>
+      <DropdownMenuContent
+        align="start"
+        width={260}
+        pages={baseBranchPages}
+        // The base branch page lists every branch in the repository, so the surface has to cap
+        // itself and scroll rather than run off the bottom of the screen.
+        scrollable
+        maxHeight={BASE_BRANCH_MENU_MAX_HEIGHT}
+        sheetTitle={t("workspace.git.diff.diffMode")}
+        testID={`${testIDPrefix}-status-menu`}
+      >
         <DropdownMenuItem
           testID={`${testIDPrefix}-mode-uncommitted`}
           selected={diffMode === "uncommitted"}
@@ -311,6 +350,22 @@ export function DiffModeMenu({
         >
           {committedLabel}
         </DropdownMenuItem>
+        {baseBranchMenu ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSubTrigger
+              id="baseBranch"
+              value={
+                formatWorkspaceBaseBranchLabel(baseBranchMenu.effectiveBaseBranch) ??
+                t("workspace.git.diff.base")
+              }
+              indicator={baseBranchMenu.baseBranchOverride !== null}
+              testID={`${testIDPrefix}-base-branch`}
+            >
+              {t("workspace.git.diff.baseBranch.label")}
+            </DropdownMenuSubTrigger>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -352,6 +407,8 @@ function DesktopTreeToggle({ visible, toggleStyle, onToggle }: DesktopTreeToggle
 interface ChangesToolbarProps {
   branchName: string | null;
   allFilesCollapsed: boolean;
+  baseBranchMenu?: WorkspaceBaseBranchMenuConfig;
+  baseBranchMenuOpen: boolean;
   canUseSplitLayout: boolean;
   changesTabOpen: boolean;
   committedDescription?: string;
@@ -372,6 +429,7 @@ interface ChangesToolbarProps {
   treeToggleStyle: PressableStyleFn;
   workspaceId?: string | null;
   wrapLines: boolean;
+  onBaseBranchMenuOpenChange: (open: boolean) => void;
   onRefresh: () => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
@@ -391,6 +449,8 @@ interface ChangesToolbarProps {
 function ChangesToolbar(props: ChangesToolbarProps) {
   const {
     branchName,
+    baseBranchMenu,
+    baseBranchMenuOpen,
     committedDescription,
     cwd,
     desktopTreeVisible,
@@ -402,6 +462,7 @@ function ChangesToolbar(props: ChangesToolbarProps) {
     serverId,
     treeToggleStyle,
     workspaceId,
+    onBaseBranchMenuOpenChange,
     onSelectBase,
     onSelectUncommitted,
     onToggleDesktopTree,
@@ -412,6 +473,9 @@ function ChangesToolbar(props: ChangesToolbarProps) {
         <DiffModeMenu
           diffMode={diffMode}
           committedDescription={committedDescription}
+          baseBranchMenu={baseBranchMenu}
+          open={baseBranchMenuOpen}
+          onOpenChange={onBaseBranchMenuOpenChange}
           onSelectUncommitted={onSelectUncommitted}
           onSelectBase={onSelectBase}
         />
@@ -704,9 +768,7 @@ function DiffBodyContent({
 }
 
 function computeBaseRefLabel(baseRef: string | undefined, fallbackLabel: string): string {
-  if (!baseRef) return fallbackLabel;
-  const trimmed = baseRef.replace(/^refs\/(heads|remotes)\//, "").trim();
-  return trimmed.startsWith("origin/") ? trimmed.slice("origin/".length) : trimmed;
+  return formatWorkspaceBaseBranchLabel(baseRef ?? null) ?? fallbackLabel;
 }
 
 function computeCommittedDiffDescription(
@@ -1141,6 +1203,7 @@ export function ChangesSurface({
     isLocalExecution: isLocalDaemon,
   });
   const fileManagerTarget = desktopOpenTargets.find((target) => target.kind === "file-manager");
+  const baseBranchControl = useWorkspaceBaseBranchControl({ serverId, workspaceId, cwd });
   const {
     changesTabOpen: workspaceChangesTabOpen,
     toggleChanges: handleToggleChangesTab,
@@ -1192,6 +1255,7 @@ export function ChangesSurface({
     serverId,
     workspaceId: workspaceId ?? undefined,
     cwd,
+    comparisonBaseRef: baseBranchControl.comparisonBaseRef,
     ignoreWhitespace: changesPreferences.hideWhitespace,
     enabled: enabled !== false,
   });
@@ -1439,6 +1503,8 @@ export function ChangesSurface({
         <ChangesToolbar
           branchName={currentBranchName}
           allFilesCollapsed={allFilesCollapsed}
+          baseBranchMenu={baseBranchControl.menuConfig}
+          baseBranchMenuOpen={baseBranchControl.menuOpen}
           canUseSplitLayout={canUseSplitLayout}
           changesTabOpen={changesTabOpen}
           committedDescription={committedDiffDescription}
@@ -1459,6 +1525,7 @@ export function ChangesSurface({
           treeToggleStyle={treeToggleStyle}
           workspaceId={workspaceId}
           wrapLines={wrapLines}
+          onBaseBranchMenuOpenChange={baseBranchControl.setMenuOpen}
           onCollapseAll={handleCollapseAllFiles}
           onExpandAll={handleExpandAllFiles}
           onRefresh={handleRefresh}
@@ -1482,7 +1549,12 @@ export function ChangesSurface({
 
       <View style={styles.diffContainer}>{bodyContent}</View>
 
-      <CommitsSection serverId={serverId} cwd={cwd} onCommitPress={handleCommitPress} />
+      <CommitsSection
+        serverId={serverId}
+        cwd={cwd}
+        baseRef={baseRef}
+        onCommitPress={handleCommitPress}
+      />
     </View>
   );
 }

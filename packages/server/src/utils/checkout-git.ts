@@ -1435,34 +1435,45 @@ async function abortGitPullConflictState(cwd: string): Promise<void> {
 }
 
 export async function resolveRepositoryDefaultBranch(repoRoot: string): Promise<string | null> {
-  try {
-    const { stdout } = await runGitCommand(
-      ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"],
-      {
-        cwd: repoRoot,
-        envOverlay: READ_ONLY_GIT_ENV,
-      },
-    );
-    const ref = stdout.trim();
-    if (ref) {
-      // Prefer a local branch name (e.g. "main") over the remote-tracking ref (e.g. "origin/main")
-      // so that status/diff/merge all operate against the same base ref.
-      const remoteShort = ref.replace(/^refs\/remotes\//, "");
-      const localName = remoteShort.startsWith("origin/")
-        ? remoteShort.slice("origin/".length)
-        : remoteShort;
-      try {
-        await runGitCommand(["show-ref", "--verify", "--quiet", `refs/heads/${localName}`], {
+  const { stdout: remotesOutput } = await runGitCommand(["remote", "-v"], {
+    cwd: repoRoot,
+    envOverlay: READ_ONLY_GIT_ENV,
+  });
+  const remoteNames = Array.from(
+    new Set(
+      remotesOutput
+        .split("\n")
+        .map((line) => line.trim().match(/^(\S+)\s+/)?.[1] ?? null)
+        .filter((name): name is string => name !== null),
+    ),
+  );
+  const defaultRemote = remoteNames.includes("origin") ? "origin" : (remoteNames[0] ?? null);
+
+  if (defaultRemote) {
+    try {
+      const { stdout } = await runGitCommand(
+        ["symbolic-ref", "--quiet", `refs/remotes/${defaultRemote}/HEAD`],
+        {
           cwd: repoRoot,
           envOverlay: READ_ONLY_GIT_ENV,
-        });
-        return localName;
-      } catch {
-        return remoteShort;
+        },
+      );
+      const ref = stdout.trim();
+      if (ref) {
+        return ref;
       }
+    } catch {
+      // Fall through to conventional branch names on the selected remote.
     }
-  } catch {
-    // ignore
+
+    const remoteMainRef = `refs/remotes/${defaultRemote}/main`;
+    if (await doesGitRefExist(repoRoot, remoteMainRef)) {
+      return remoteMainRef;
+    }
+    const remoteMasterRef = `refs/remotes/${defaultRemote}/master`;
+    if (await doesGitRefExist(repoRoot, remoteMasterRef)) {
+      return remoteMasterRef;
+    }
   }
 
   const { stdout } = await runGitCommand(["branch", "--format=%(refname:short)"], {
@@ -1561,6 +1572,13 @@ async function resolveBestComparisonBaseRef(
 }
 
 async function resolveMostAheadBaseRef(cwd: string, baseRef: string): Promise<string> {
+  if (baseRef.startsWith("origin/")) {
+    const remoteRef = `refs/remotes/${baseRef}`;
+    if (await doesGitRefExist(cwd, remoteRef)) {
+      return baseRef;
+    }
+    throw new Error(`Base ref not found: ${baseRef}`);
+  }
   if (isQualifiedBranchRef(baseRef)) {
     if (await doesGitRefExist(cwd, baseRef)) {
       return baseRef;
@@ -2449,9 +2467,11 @@ async function tryResolveCheckoutCommitsBaseRef(
 
 export async function listCheckoutCommits({
   cwd,
+  baseRef,
   context,
 }: {
   cwd: string;
+  baseRef?: string;
   context?: CheckoutContext;
 }): Promise<CheckoutCommitsResult> {
   const currentBranch = await getCurrentBranch(cwd);
@@ -2459,7 +2479,8 @@ export async function listCheckoutCommits({
     return { baseRef: null, commits: [] };
   }
 
-  const { resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
+  const storedResolution = await resolveBaseRefForCwd(cwd, context);
+  const resolvedBaseRef = baseRef?.trim() || storedResolution.resolvedBaseRef;
   const normalizedBaseRef = resolvedBaseRef ? branchNameFromRef(resolvedBaseRef) : null;
   let comparisonBaseRef = await tryResolveCheckoutCommitsBaseRef(
     cwd,
@@ -3210,11 +3231,9 @@ async function resolveCheckoutDiffRefs(
     return { baseRef: "HEAD", includeUntracked: true };
   }
   const { storedBaseRef, resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
-  const baseRef = resolveOperationBaseRef({
-    storedBaseRef,
-    resolvedBaseRef,
-    requestedBaseRef: compare.baseRef,
-  });
+  // A committed diff is an inspection operation, so an explicit comparison branch
+  // is authoritative. The stored worktree base remains a creation/recovery fact.
+  const baseRef = compare.baseRef?.trim() || storedBaseRef || resolvedBaseRef;
   if (!baseRef) {
     return null;
   }

@@ -10,6 +10,38 @@ import {
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
+  test("parses workspace base branch updates", () => {
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "workspace.base_branch.set.request",
+        requestId: "req-base",
+        workspaceId: "ws-1",
+        baseBranch: "release",
+      }),
+    ).toMatchObject({
+      type: "workspace.base_branch.set.request",
+      workspaceId: "ws-1",
+      baseBranch: "release",
+    });
+
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "workspace.base_branch.set.response",
+        payload: {
+          requestId: "req-base",
+          workspaceId: "ws-1",
+          accepted: true,
+          baseBranch: "release",
+          baseBranchOverride: "release",
+          error: null,
+        },
+      }),
+    ).toMatchObject({
+      type: "workspace.base_branch.set.response",
+      payload: { baseBranch: "release", baseBranchOverride: "release" },
+    });
+  });
+
   test("parses fetch_workspaces_request", () => {
     const parsed = SessionInboundMessageSchema.parse({
       type: "fetch_workspaces_request",

@@ -18,6 +18,7 @@ interface UseWorkingDiffOptions {
   serverId: string;
   workspaceId?: string;
   cwd: string;
+  comparisonBaseRef?: string | null;
   ignoreWhitespace: boolean;
   enabled: boolean;
   queryScope?: string;
@@ -27,6 +28,7 @@ export function useWorkingDiff({
   serverId,
   workspaceId,
   cwd,
+  comparisonBaseRef,
   ignoreWhitespace,
   enabled,
   queryScope,
@@ -43,7 +45,11 @@ export function useWorkingDiff({
   const statusErrorMessage =
     status?.error?.message ??
     (isStatusError && statusError instanceof Error ? statusError.message : null);
-  const baseRef = gitStatus?.baseRef ?? undefined;
+  // COMPAT(workspaceBaseBranch): added in v0.3.0, remove fallback after 2027-02-07.
+  const baseRef =
+    comparisonBaseRef !== undefined
+      ? (comparisonBaseRef ?? undefined)
+      : (gitStatus?.baseRef ?? undefined);
   const hasUncommittedChanges = Boolean(gitStatus?.isDirty);
   const currentBranchName =
     gitStatus?.currentBranch && gitStatus.currentBranch !== "HEAD" ? gitStatus.currentBranch : null;

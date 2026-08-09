@@ -117,6 +117,8 @@ export interface WorkspaceDescriptor {
   workspaceKind: WorkspaceDescriptorPayload["workspaceKind"];
   name: string;
   title?: string | null;
+  baseBranch?: string | null;
+  baseBranchOverride?: string | null;
   pinnedAt?: string | null;
   labels?: string[];
   status: WorkspaceDescriptorPayload["status"];
@@ -154,6 +156,8 @@ export function normalizeWorkspaceDescriptor(
     workspaceKind: payload.workspaceKind,
     name: payload.name,
     title: payload.title ?? null,
+    baseBranch: payload.baseBranch,
+    baseBranchOverride: payload.baseBranchOverride,
     pinnedAt: payload.pinnedAt ?? null,
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],

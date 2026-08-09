@@ -157,6 +157,26 @@ describe("listCheckoutCommits", () => {
     expect(commits.map((entry) => entry.isOnBase)).toEqual([false, true]);
   });
 
+  it("uses an explicit comparison branch instead of saved worktree ancestry", async () => {
+    const { repoDir, tempDir } = initRepoOnMain();
+    git(["branch", "release"], repoDir);
+    const worktreesRoot = join(tempDir, "worktrees");
+    const worktreeDir = join(worktreesRoot, "repo-hash", "feature");
+    mkdirSync(join(worktreesRoot, "repo-hash"), { recursive: true });
+    git(["worktree", "add", "-b", "feature", worktreeDir], repoDir);
+    commitFile(worktreeDir, "feature.txt", "feature\n", "Feature work");
+    writePaseoWorktreeMetadata(worktreeDir, { baseRefName: "release" });
+
+    const { baseRef, commits } = await listCheckoutCommits({
+      cwd: worktreeDir,
+      baseRef: "main",
+      context: { worktreesRoot },
+    });
+
+    expect(baseRef).toBe("main");
+    expect(commits.map((entry) => entry.subject)).toEqual(["Feature work", "initial"]);
+  });
+
   it("marks all commits local-only when there is no remote", async () => {
     const { repoDir } = initRepoOnMain();
     git(["checkout", "-b", "feature"], repoDir);
@@ -198,6 +218,27 @@ describe("listCheckoutCommits", () => {
     expect(commits.map(({ subject, isOnBase }) => ({ subject, isOnBase }))).toEqual([
       { subject: "Feature work", isOnBase: false },
       { subject: "Local base work", isOnBase: true },
+      { subject: "initial", isOnBase: true },
+    ]);
+  });
+
+  it("keeps an explicit origin base ref when the local default branch is ahead", async () => {
+    const { repoDir, tempDir } = initRepoOnMain();
+    addBareRemote(repoDir, tempDir);
+    git(["push", "-u", "origin", "main"], repoDir);
+    commitFile(repoDir, "local-base.txt", "base\n", "Local base work");
+    git(["checkout", "-b", "feature"], repoDir);
+    commitFile(repoDir, "feature.txt", "feature\n", "Feature work");
+
+    const { baseRef, commits } = await listCheckoutCommits({
+      cwd: repoDir,
+      baseRef: "origin/main",
+    });
+
+    expect(baseRef).toBe("origin/main");
+    expect(commits.map(({ subject, isOnBase }) => ({ subject, isOnBase }))).toEqual([
+      { subject: "Feature work", isOnBase: false },
+      { subject: "Local base work", isOnBase: false },
       { subject: "initial", isOnBase: true },
     ]);
   });

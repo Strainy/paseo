@@ -978,6 +978,14 @@ export const WorkspaceTitleSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const WorkspaceBaseBranchSetRequestSchema = z.object({
+  type: z.literal("workspace.base_branch.set.request"),
+  workspaceId: z.string(),
+  // Null clears the workspace override and follows the repository default branch.
+  baseBranch: z.string().nullable(),
+  requestId: z.string(),
+});
+
 export const WorkspacePinSetRequestSchema = z.object({
   type: z.literal("workspace.pin.set.request"),
   workspaceId: z.string(),
@@ -1932,6 +1940,20 @@ export const WorkspaceTitleSetResponseSchema = z.object({
   payload: WorkspaceTitleSetResponsePayloadSchema,
 });
 
+export const WorkspaceBaseBranchSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  baseBranch: z.string().nullable(),
+  baseBranchOverride: z.string().nullable(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceBaseBranchSetResponseSchema = z.object({
+  type: z.literal("workspace.base_branch.set.response"),
+  payload: WorkspaceBaseBranchSetResponsePayloadSchema,
+});
+
 export const WorkspacePinSetResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -2143,6 +2165,7 @@ const CheckoutCommitSchema = z.object({
 export const CheckoutCommitsListRequestSchema = z.object({
   type: z.literal("checkout.commits.list.request"),
   cwd: z.string(),
+  baseRef: z.string().optional(),
   requestId: z.string(),
 });
 
@@ -2959,6 +2982,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
+  WorkspaceBaseBranchSetRequestSchema,
   WorkspacePinSetRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
@@ -3370,6 +3394,8 @@ export const ServerInfoStatusPayloadSchema = z
         providerSubagents: z.boolean().optional(),
         // COMPAT(workspacePinning): added in v0.1.107, remove gate after 2027-01-12.
         workspacePinning: z.boolean().optional(),
+        // COMPAT(workspaceBaseBranch): added in v0.3.0, remove after 2027-02-07.
+        workspaceBaseBranch: z.boolean().optional(),
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: z.boolean().optional(),
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.
@@ -3707,6 +3733,11 @@ export const WorkspaceDescriptorPayloadSchema = z
     // its input and offer a "reset to branch name" action. Null means the name
     // is derived from the branch/directory.
     title: z.string().nullable().optional(),
+    // COMPAT(workspaceBaseBranch): added in v0.3.0, remove optional after 2027-02-07.
+    // Effective comparison branch. When the override is null, this is the repository default.
+    baseBranch: z.string().nullable().optional(),
+    // Raw workspace override. Null means follow the repository default branch.
+    baseBranchOverride: z.string().nullable().optional(),
     // COMPAT(workspacePinning): added in v0.1.107, remove optional after 2027-01-12.
     pinnedAt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
@@ -6254,6 +6285,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
+  WorkspaceBaseBranchSetResponseSchema,
   WorkspacePinSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
@@ -6452,6 +6484,10 @@ export type WorkspaceTitleSetResponse = z.infer<typeof WorkspaceTitleSetResponse
 export type WorkspaceTitleSetResponsePayload = z.infer<
   typeof WorkspaceTitleSetResponsePayloadSchema
 >;
+export type WorkspaceBaseBranchSetResponse = z.infer<typeof WorkspaceBaseBranchSetResponseSchema>;
+export type WorkspaceBaseBranchSetResponsePayload = z.infer<
+  typeof WorkspaceBaseBranchSetResponsePayloadSchema
+>;
 export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSchema>;
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceRecoveryState = z.infer<typeof WorkspaceRecoveryStateSchema>;
@@ -6599,6 +6635,7 @@ export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
 export type ProjectIconSetRequest = z.infer<typeof ProjectIconSetRequestSchema>;
 export type ProjectRemoveRequest = z.infer<typeof ProjectRemoveRequestSchema>;
 export type WorkspaceTitleSetRequest = z.infer<typeof WorkspaceTitleSetRequestSchema>;
+export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
 export type WorkspacePinSetRequest = z.infer<typeof WorkspacePinSetRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;

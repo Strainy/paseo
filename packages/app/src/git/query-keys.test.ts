@@ -26,6 +26,7 @@ describe("checkout query keys", () => {
     });
     queryClient.setQueryData(checkoutPrStatusQueryKey(serverId, cwd), { status: { number: 12 } });
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd), { commits: [] });
+    queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd, "main"), { commits: [] });
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, "/tmp/other"), { commits: [] });
     queryClient.setQueryData(prPaneTimelineQueryKey({ serverId, cwd, prNumber: 12 }), {
       items: [],
@@ -68,6 +69,9 @@ describe("checkout query keys", () => {
     expect(queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd))?.isInvalidated).toBe(
       true,
     );
+    expect(
+      queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd, "main"))?.isInvalidated,
+    ).toBe(true);
     expect(
       queryClient.getQueryState(checkoutCommitsQueryKey(serverId, "/tmp/other"))?.isInvalidated,
     ).toBe(false);
