@@ -49,12 +49,19 @@ the current checkout:
 
 ```bash
 mise run install:macos
+mise run install:local-daemon
 mise run install:remote-daemon -- dev-server
 ```
 
 `install:macos` builds and smoke-tests the native architecture, moves the
 existing `/Applications/Paseo.app` to the Trash, installs the new app, and opens
 it. Set `PASEO_MACOS_INSTALL_DIR` when the app lives elsewhere.
+
+`install:local-daemon` builds the internal npm packages, installs them with the
+current user's npm prefix, and starts or restarts the standalone daemon with its
+configured home and listen address. It bootstraps the npm prefix when no Paseo
+CLI is installed. Set `PASEO_PASSWORD` when daemon auth is configured. Use
+`install:macos` for the desktop-managed daemon.
 
 `install:remote-daemon` accepts an SSH config host or `user@host`. It builds the
 internal npm packages, installs them with the remote user's npm prefix, and
