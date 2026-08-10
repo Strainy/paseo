@@ -37,6 +37,13 @@ for command_name in npm codesign ditto open osascript pgrep; do
 done
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+for dependency_command in tsc cross-env expo electron-builder; do
+  if [[ ! -x "$repo_root/node_modules/.bin/$dependency_command" ]]; then
+    echo "Dependencies are missing or incomplete. Run mise exec -- npm ci before this task." >&2
+    exit 1
+  fi
+done
+
 install_dir="${PASEO_MACOS_INSTALL_DIR:-/Applications}"
 target_app="$install_dir/Paseo.app"
 
