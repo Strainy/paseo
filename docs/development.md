@@ -44,9 +44,13 @@ Use the repository-local mise tasks to replace a development installation with
 the current checkout:
 
 ```bash
+mise exec -- npm ci
 mise run install:macos
 mise run install:remote-daemon -- dev-server
 ```
+
+Run `mise exec -- npm ci` first in a fresh checkout and whenever dependencies
+change.
 
 `install:macos` builds and smoke-tests the native architecture, moves the
 existing `/Applications/Paseo.app` to the Trash, installs the new app, and opens
