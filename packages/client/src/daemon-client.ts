@@ -2595,6 +2595,44 @@ export class DaemonClient {
     return { title: payload.title };
   }
 
+  async setWorkspaceLabels(
+    workspaceId: string,
+    labels: string[],
+    requestId?: string,
+  ): Promise<{ labels: string[] }> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.labels.set.response">({
+        requestId,
+        message: {
+          type: "workspace.labels.set.request",
+          workspaceId,
+          labels,
+        },
+      });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceLabels rejected");
+    }
+    return { labels: payload.labels };
+  }
+
+  async deleteWorkspaceLabel(
+    label: string,
+    requestId?: string,
+  ): Promise<{ updatedWorkspaceIds: string[] }> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.labels.delete.response">({
+        requestId,
+        message: {
+          type: "workspace.labels.delete.request",
+          label,
+        },
+      });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "deleteWorkspaceLabel rejected");
+    }
+    return { updatedWorkspaceIds: payload.updatedWorkspaceIds };
+  }
+
   async setWorkspacePinned(
     workspaceId: string,
     pinned: boolean,
@@ -4088,6 +4126,7 @@ export class DaemonClient {
     input: {
       source: WorkspaceCreateRequest["source"];
       title?: string;
+      labels?: string[];
       firstAgentContext?: WorkspaceCreateRequest["firstAgentContext"];
     },
     requestId?: string,
@@ -4098,6 +4137,7 @@ export class DaemonClient {
         type: "workspace.create.request",
         source: input.source,
         ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.labels !== undefined ? { labels: input.labels } : {}),
         ...(input.firstAgentContext !== undefined
           ? { firstAgentContext: input.firstAgentContext }
           : {}),

@@ -266,6 +266,13 @@ type ProviderSubagentManagerEvent = Extract<
 const LEGACY_PROVIDER_IDS = new Set(["claude", "codex", "opencode"]);
 const MIN_VERSION_ALL_PROVIDERS = "0.1.45";
 const MIN_VERSION_EXPLICIT_WORKSPACE_RECOVERY = "0.1.105";
+
+function normalizeWorkspaceLabels(labels: readonly string[] | undefined): string[] {
+  return Array.from(
+    new Set((labels ?? []).map((label) => label.trim()).filter((label) => label.length > 0)),
+  );
+}
+
 function errorToFriendlyMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -2289,6 +2296,9 @@ export class Session {
   private dispatchWorkspaceAndProjectMessage(
     msg: SessionInboundMessage,
   ): Promise<void> | undefined {
+    const metadataMutation = this.dispatchWorkspaceMetadataMessage(msg);
+    if (metadataMutation) return metadataMutation;
+
     switch (msg.type) {
       case "fetch_workspaces_request":
         return this.handleFetchWorkspacesRequest(msg);
@@ -2325,8 +2335,19 @@ export class Session {
         return this.handleWorkspaceCreateRequest(msg);
       case "workspace.clear_attention.request":
         return this.handleWorkspaceClearAttentionRequest(msg);
+      default:
+        return undefined;
+    }
+  }
+
+  private dispatchWorkspaceMetadataMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
       case "workspace.title.set.request":
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
+      case "workspace.labels.set.request":
+        return this.handleWorkspaceLabelsSetRequest(msg.workspaceId, msg.labels, msg.requestId);
+      case "workspace.labels.delete.request":
+        return this.handleWorkspaceLabelDeleteRequest(msg.label, msg.requestId);
       case "workspace.pin.set.request":
         return this.handleWorkspacePinSetRequest(msg.workspaceId, msg.pinned, msg.requestId);
       default:
@@ -3125,6 +3146,81 @@ export class Session {
           error: getErrorMessageOr(error, "Failed to set workspace title"),
         },
       });
+    }
+  }
+
+  private async handleWorkspaceLabelsSetRequest(
+    workspaceId: string,
+    labels: string[],
+    requestId: string,
+  ): Promise<void> {
+    const normalizedLabels = normalizeWorkspaceLabels(labels);
+    const emitResponse = (accepted: boolean, nextLabels: string[], error: string | null) => {
+      this.emit({
+        type: "workspace.labels.set.response",
+        payload: { requestId, workspaceId, accepted, labels: nextLabels, error },
+      });
+    };
+
+    try {
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        labels: normalizedLabels,
+        updatedAt: new Date().toISOString(),
+      }));
+      if (!updated) {
+        emitResponse(false, [], "Workspace not found");
+        return;
+      }
+      emitResponse(true, normalizedLabels, null);
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error, workspaceId, requestId },
+        "session: workspace.labels.set.request error",
+      );
+      emitResponse(false, [], getErrorMessageOr(error, "Failed to set workspace labels"));
+    }
+  }
+
+  private async handleWorkspaceLabelDeleteRequest(label: string, requestId: string): Promise<void> {
+    const normalizedLabel = normalizeWorkspaceLabels([label])[0] ?? "";
+    const emitResponse = (
+      accepted: boolean,
+      updatedWorkspaceIds: string[],
+      error: string | null,
+    ) => {
+      this.emit({
+        type: "workspace.labels.delete.response",
+        payload: {
+          requestId,
+          label: normalizedLabel,
+          accepted,
+          updatedWorkspaceIds,
+          error,
+        },
+      });
+    };
+
+    if (!normalizedLabel) {
+      emitResponse(false, [], "Label is required");
+      return;
+    }
+
+    try {
+      const updated = await this.workspaceRegistry.deleteLabel(
+        normalizedLabel,
+        new Date().toISOString(),
+      );
+      const updatedWorkspaceIds = updated.map((workspace) => workspace.workspaceId);
+      emitResponse(true, updatedWorkspaceIds, null);
+      await this.emitWorkspaceUpdatesForWorkspaceIds(updatedWorkspaceIds);
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error, label: normalizedLabel, requestId },
+        "session: workspace.labels.delete.request error",
+      );
+      emitResponse(false, [], getErrorMessageOr(error, "Failed to delete workspace label"));
     }
   }
 
@@ -4611,6 +4707,7 @@ export class Session {
       workspaceKind: workspace.kind,
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
+      labels: workspace.labels,
       pinnedAt: workspace.pinnedAt,
       archivingAt: null,
       status: "done",
@@ -4702,6 +4799,7 @@ export class Session {
         derivedDisplayName: result.worktree.branchName || result.workspace.displayName,
       }),
       title: result.workspace.title,
+      labels: result.workspace.labels,
       pinnedAt: result.workspace.pinnedAt,
       archivingAt: null,
       status: "done",
@@ -5581,7 +5679,10 @@ export class Session {
       cwd,
       explicitTitle ?? promptTitle,
       request.source.projectId,
-      { expectsInitialAgent: Boolean(request.firstAgentContext) },
+      {
+        expectsInitialAgent: Boolean(request.firstAgentContext),
+        labels: normalizeWorkspaceLabels(request.labels),
+      },
     );
     await this.syncWorkspaceGitObserverForWorkspace(workspace);
     const descriptor = await this.describeWorkspaceRecord(workspace);
@@ -5656,6 +5757,7 @@ export class Session {
         githubPrNumber: source.githubPrNumber,
         firstAgentContext: request.firstAgentContext,
         title: request.title,
+        labels: normalizeWorkspaceLabels(request.labels),
       },
       source.baseBranch
         ? { resolveDefaultBranch: async () => source.baseBranch as string }

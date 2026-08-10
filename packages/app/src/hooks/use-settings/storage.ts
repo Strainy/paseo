@@ -17,6 +17,7 @@ import {
 import { THEME_OPTIONS, type ThemePreference } from "@/styles/theme";
 import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
+import { normalizeWorkspaceLabels } from "@/workspace/workspace-labels";
 
 export const APP_SETTINGS_KEY = "@paseo:app-settings";
 export const APP_SETTINGS_QUERY_KEY = ["app-settings"];
@@ -67,6 +68,7 @@ export interface AppSettings {
   sidebarWorkspaceTrailing: SidebarWorkspaceTrailing;
   sidebarRowItems: SidebarRowItems;
   sidebarChecksDisplay: SidebarChecksDisplay;
+  workspaceLabelHistory: string[];
   autoExpandReasoning: boolean;
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
@@ -106,6 +108,9 @@ const StoredAppSettingsSchema = z.strictObject({
   sidebarWorkspaceTrailing: z.enum(["diff", "timestamp", "none"]).optional(),
   sidebarRowItems: SidebarRowItemsSchema.optional(),
   sidebarChecksDisplay: z.enum(["iconAndText", "icon", "none"]).optional(),
+  // Stored entries are normalized on read, so anything non-string is dropped rather than
+  // failing the whole strict parse and wiping every other setting.
+  workspaceLabelHistory: z.array(z.unknown()).optional(),
   autoExpandReasoning: z.boolean().optional(),
   toolCallDetailLevel: z.enum(["overview", "detailed"]).optional(),
   compactToolCalls: z.boolean().optional(),
@@ -136,6 +141,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarWorkspaceTrailing: "diff",
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
+  workspaceLabelHistory: [],
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
@@ -333,6 +339,11 @@ function pickAppSettings(stored: StoredAppSettings): Partial<AppSettings> {
   Object.assign(result, pickEnumAppSettings(stored));
   if (stored.sidebarRowItems !== undefined) {
     result.sidebarRowItems = parseSidebarRowItems(stored.sidebarRowItems);
+  }
+  if (Array.isArray(stored.workspaceLabelHistory)) {
+    result.workspaceLabelHistory = normalizeWorkspaceLabels(
+      stored.workspaceLabelHistory.filter((label): label is string => typeof label === "string"),
+    );
   }
   const sidebarChecksDisplay = parseStoredSidebarChecksDisplay(stored);
   if (sidebarChecksDisplay !== null) {

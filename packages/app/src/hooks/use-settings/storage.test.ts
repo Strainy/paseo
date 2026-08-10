@@ -391,6 +391,20 @@ describe("appearance settings", () => {
     expect(result.codeFontSize).toBe(DEFAULT_CODE_FONT_SIZE);
     expect(result.syntaxTheme).toBe("one");
     expect(result.toolCallDetailLevel).toBe("detailed");
+    expect(result.workspaceLabelHistory).toEqual([]);
+  });
+
+  it("normalizes saved workspace label history", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          workspaceLabelHistory: [" urgent ", 42, "frontend", "urgent", ""],
+        }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+    expect(result.workspaceLabelHistory).toEqual(["urgent", "frontend"]);
   });
 
   it("migrates the enabled compact tool call preference to overview", async () => {

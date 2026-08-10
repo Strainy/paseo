@@ -3,14 +3,22 @@ import type { ReactElement, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Pressable, StyleSheet as RNStyleSheet, Text, View } from "react-native";
-import type { PressableStateCallbackType } from "react-native";
+import type { PressableStateCallbackType, StyleProp, ViewStyle } from "react-native";
 import ReanimatedAnimated from "react-native-reanimated";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Folder, FolderPlus, GitBranch, GitPullRequest } from "lucide-react-native";
+import {
+  ChevronDown,
+  Folder,
+  FolderPlus,
+  GitBranch,
+  GitPullRequest,
+  Tags,
+} from "lucide-react-native";
 import { Composer } from "@/composer";
+import { WorkspaceLabelsModal } from "@/components/workspace-labels-modal";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import {
   resolveComposerAttachmentSubmitFormat,
@@ -672,6 +680,96 @@ function IsolationPickerTrigger({
   );
 }
 
+interface NewWorkspaceLabelsState {
+  values: string[];
+  available: boolean;
+  unavailableReason: string;
+  onOpen: () => void;
+}
+
+/** Labels the workspace will be created with, plus the modal that edits them. */
+function useNewWorkspaceLabels(input: {
+  supportsLabels: boolean;
+  supportsMultiplicity: boolean;
+  isConnected: boolean;
+}): {
+  state: NewWorkspaceLabelsState;
+  modalVisible: boolean;
+  close: () => void;
+  submit: (labels: string[]) => void;
+} {
+  const { t } = useTranslation();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [values, setValues] = useState<string[]>([]);
+  const open = useCallback(() => setModalVisible(true), []);
+  const close = useCallback(() => setModalVisible(false), []);
+  const submit = useCallback((labels: string[]) => setValues(labels), []);
+  const available = input.supportsLabels && input.supportsMultiplicity;
+  const unavailableReason = input.isConnected
+    ? t("sidebar.workspace.labels.updateHost")
+    : t("newWorkspace.errors.hostDisconnected");
+
+  const state = useMemo(
+    () => ({ values, available, unavailableReason, onOpen: open }),
+    [values, available, unavailableReason, open],
+  );
+  return { state, modalVisible, close, submit };
+}
+
+function LabelsTrigger({
+  labels,
+  isPending,
+  badgePressableStyle,
+  iconColor,
+  iconSize,
+}: {
+  labels: NewWorkspaceLabelsState;
+  isPending: boolean;
+  badgePressableStyle: (
+    state: PressableStateCallbackType & { hovered?: boolean },
+  ) => StyleProp<ViewStyle>[];
+  iconColor: string;
+  iconSize: number;
+}) {
+  const { t } = useTranslation();
+  const pressableStyle = useCallback(
+    (state: PressableStateCallbackType & { hovered?: boolean }) => [
+      badgePressableStyle(state),
+      !labels.available && styles.badgeDisabled,
+    ],
+    [badgePressableStyle, labels.available],
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Pressable
+          onPress={labels.onOpen}
+          disabled={isPending || !labels.available}
+          style={pressableStyle}
+          accessibilityRole="button"
+          accessibilityLabel={t("sidebar.workspace.actions.editLabels")}
+          testID="new-workspace-labels"
+        >
+          <View style={styles.badgeIconBox}>
+            <Tags size={iconSize} color={iconColor} />
+          </View>
+          <Text style={styles.badgeText} numberOfLines={1}>
+            {labels.values.length > 0
+              ? labels.values.join(", ")
+              : t("sidebar.workspace.labels.title")}
+          </Text>
+        </Pressable>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center" offset={8}>
+        <Text style={styles.tooltipText}>
+          {labels.available ? t("sidebar.workspace.labels.title") : labels.unavailableReason}
+        </Text>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 // Wraps a single argument control in the mobile vertical stack. On desktop the
 // controls are laid out in one horizontal row, so no per-control wrapper is used.
 function FormRow({ children }: { children: React.ReactNode }) {
@@ -802,6 +900,7 @@ async function createMultiplicityWorkspace(input: {
   withInitialAgent: boolean;
   prompt: string;
   attachments: AgentAttachment[];
+  labels?: string[];
   mergeWorkspaces: (
     serverId: string,
     workspaces: ReturnType<typeof normalizeWorkspaceDescriptor>[],
@@ -831,6 +930,7 @@ async function createMultiplicityWorkspace(input: {
           projectId,
         },
     ...(firstAgentContext ? { firstAgentContext } : {}),
+    ...(input.labels ? { labels: input.labels } : {}),
   });
   if (payload.error || !payload.workspace) {
     throw new Error(payload.error ?? input.createFailedMessage);
@@ -1336,12 +1436,13 @@ interface NewWorkspaceFormStackInput {
     profiles: readonly TerminalProfile[];
     disabled: boolean;
   };
+  labels: NewWorkspaceLabelsState;
 }
 
 function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactElement {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
-  const { isCompact, isPending, project, host, isolation, base, launch } = input;
+  const { isCompact, isPending, project, host, isolation, base, launch, labels } = input;
 
   const selectedHostLabel =
     host.allHosts.find((h) => h.serverId === host.selectedServerId)?.label ?? "Host";
@@ -1514,12 +1615,23 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
     />
   );
 
+  const labelsControl = (
+    <LabelsTrigger
+      labels={labels}
+      isPending={isPending}
+      badgePressableStyle={badgePressableStyle}
+      iconColor={theme.colors.foregroundMuted}
+      iconSize={theme.iconSize.sm}
+    />
+  );
+
   return isCompact ? (
     <View testID="new-workspace-ref-picker-row" style={styles.formStack}>
       <FormRow>{projectControl}</FormRow>
       {hostControl ? <FormRow>{hostControl}</FormRow> : null}
       {isolationControl ? <FormRow>{isolationControl}</FormRow> : null}
       {baseControl ? <FormRow>{baseControl}</FormRow> : null}
+      <FormRow>{labelsControl}</FormRow>
       <FormRow>{launchControl}</FormRow>
       {/* Keep fixed stack height without separating the visible controls. */}
       {isolationControl ? null : <View style={styles.baseSpacer} />}
@@ -1531,6 +1643,7 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
       {hostControl}
       {isolationControl}
       {baseControl}
+      {labelsControl}
       <View style={styles.launchSpacer} />
       {launchControl}
     </View>
@@ -1570,6 +1683,7 @@ export function NewWorkspaceScreen({
   });
   // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
   const supportsWorkspaceMultiplicity = useHostFeature(selectedServerId, "workspaceMultiplicity");
+  const supportsWorkspaceLabels = useHostFeature(selectedServerId, "workspaceLabels");
   const supportsForgeSearch = useHostFeature(selectedServerId, "forgeSearch");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdWorkspace, setCreatedWorkspace] = useState<ReturnType<
@@ -1629,6 +1743,12 @@ export function NewWorkspaceScreen({
   const workspace = createdWorkspace;
   const client = useHostRuntimeClient(selectedServerId);
   const isConnected = useHostRuntimeIsConnected(selectedServerId);
+  const workspaceLabelsControl = useNewWorkspaceLabels({
+    supportsLabels: supportsWorkspaceLabels,
+    supportsMultiplicity: supportsWorkspaceMultiplicity,
+    isConnected,
+  });
+  const workspaceLabels = workspaceLabelsControl.state.values;
   const {
     selectedProject,
     selectedSourceDirectory,
@@ -2015,6 +2135,7 @@ export function NewWorkspaceScreen({
             withInitialAgent: input.withInitialAgent,
             prompt: input.prompt,
             attachments: input.attachments,
+            labels: supportsWorkspaceLabels ? workspaceLabels : undefined,
             mergeWorkspaces,
             serverId: selectedServerId,
             createFailedMessage: t("newWorkspace.errors.createWorktreeFailed"),
@@ -2040,8 +2161,10 @@ export function NewWorkspaceScreen({
       selectedServerId,
       selectedSourceDirectory,
       supportsWorkspaceMultiplicity,
+      supportsWorkspaceLabels,
       t,
       withConnectedClient,
+      workspaceLabels,
     ],
   );
 
@@ -2275,6 +2398,7 @@ export function NewWorkspaceScreen({
       profiles: terminalProfiles,
       disabled: isPending,
     },
+    labels: workspaceLabelsControl.state,
   });
 
   const screenHeaderLeft = useMemo(() => <SidebarMenuToggle />, []);
@@ -2350,6 +2474,14 @@ export function NewWorkspaceScreen({
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         </ReanimatedAnimated.View>
       </View>
+      <WorkspaceLabelsModal
+        visible={workspaceLabelsControl.modalVisible}
+        serverId={selectedServerId}
+        initialLabels={workspaceLabels}
+        onClose={workspaceLabelsControl.close}
+        onSubmit={workspaceLabelsControl.submit}
+        testID="new-workspace-labels-modal"
+      />
     </FileDropZone>
   );
 }

@@ -52,6 +52,7 @@ import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import type { PinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import type { StatusGroup } from "@/hooks/sidebar-status-view-model";
+import type { LabelGroup } from "@/hooks/sidebar-label-view-model";
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useHosts } from "@/runtime/host-runtime";
@@ -84,6 +85,7 @@ const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_PASEO_DEV_BUILD_LABEL?.trim() ||
 interface SidebarSharedProps {
   theme: SidebarTheme;
   statusGroups: StatusGroup[];
+  labelGroups: LabelGroup[];
   pinnedGroups: PinnedSidebarGroups;
   projects: SidebarProjectEntry[];
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
@@ -145,6 +147,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
     isRevalidating,
     refreshAll,
     statusGroups,
+    labelGroups,
     pinnedGroups,
     collapsedProjectKeys,
     toggleProjectCollapsed,
@@ -243,6 +246,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
   const sharedProps = {
     theme,
     statusGroups,
+    labelGroups,
     pinnedGroups,
     projects,
     workspaceEntriesByKey,
@@ -596,6 +600,7 @@ function SidebarFooter({
 function MobileSidebar({
   theme,
   statusGroups,
+  labelGroups,
   pinnedGroups,
   projects,
   workspaceEntriesByKey,
@@ -713,6 +718,7 @@ function MobileSidebar({
             shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
             groupMode={groupMode}
             statusGroups={statusGroups}
+            labelGroups={labelGroups}
             pinnedGroups={pinnedGroups}
             projects={projects}
             workspaceEntriesByKey={workspaceEntriesByKey}
@@ -743,6 +749,7 @@ function MobileSidebar({
 function DesktopSidebar({
   theme,
   statusGroups,
+  labelGroups,
   pinnedGroups,
   projects,
   workspaceEntriesByKey,
@@ -914,6 +921,7 @@ function DesktopSidebar({
             shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
             groupMode={groupMode}
             statusGroups={statusGroups}
+            labelGroups={labelGroups}
             pinnedGroups={pinnedGroups}
             projects={projects}
             workspaceEntriesByKey={workspaceEntriesByKey}

@@ -4,11 +4,11 @@ import { persist, type StateStorage } from "zustand/middleware";
 import { z } from "zod";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 
-export type SidebarGroupMode = "project" | "status";
+export type SidebarGroupMode = "project" | "status" | "label";
 
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
-const SIDEBAR_VIEW_STORE_VERSION = 2;
+const SIDEBAR_VIEW_STORE_VERSION = 3;
 
 interface SidebarViewStoreState {
   groupMode: SidebarGroupMode;
@@ -25,7 +25,7 @@ interface SidebarViewPersistedState {
   hostFilters: string[];
 }
 
-const SidebarGroupModeSchema = z.enum(["project", "status"]);
+const SidebarGroupModeSchema = z.enum(["project", "status", "label"]);
 const SidebarViewPersistedStateSchema = z.strictObject({
   groupMode: SidebarGroupModeSchema.optional(),
   hostFilters: z.array(z.string()).optional(),

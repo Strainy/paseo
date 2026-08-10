@@ -1,4 +1,5 @@
 import { buildStatusGroups, type StatusGroup } from "@/hooks/sidebar-status-view-model";
+import { buildLabelGroups, type LabelGroup } from "@/hooks/sidebar-label-view-model";
 import {
   splitPinnedSidebarGroups,
   type PinnedSidebarGroups,
@@ -18,6 +19,7 @@ import {
 export interface SidebarProjection {
   pinnedGroups: PinnedSidebarGroups;
   statusGroups: StatusGroup[];
+  labelGroups: LabelGroup[];
   shortcutModel: SidebarShortcutModel;
 }
 
@@ -31,6 +33,7 @@ export function buildSidebarProjection(input: {
   pinnedCollapsed: boolean;
   collapsedProjectKeys: ReadonlySet<string>;
   collapsedStatusGroupKeys: ReadonlySet<string>;
+  unlabeledLabel: string;
 }): SidebarProjection {
   const pinnedGroups = splitPinnedSidebarGroups({
     projects: input.projects,
@@ -47,7 +50,15 @@ export function buildSidebarProjection(input: {
           input.projectNamesByViewKey,
         )
       : [];
-
+  const labelGroups =
+    input.groupMode === "label"
+      ? buildLabelGroups(
+          Array.from(input.workspaceEntriesByKey.values()).filter(
+            (workspace) => !pinnedWorkspaceKeys.has(workspace.workspaceKey),
+          ),
+          input.unlabeledLabel,
+        )
+      : [];
   const sections: SidebarShortcutSection[] = [];
   if (!input.pinnedCollapsed) {
     sections.push({ workspaces: pinnedGroups.pinnedChats });
@@ -57,6 +68,13 @@ export function buildSidebarProjection(input: {
       ...statusGroups.map((group) => ({
         workspaces: group.rows,
         collapsed: input.collapsedStatusGroupKeys.has(group.bucket),
+      })),
+    );
+  } else if (input.groupMode === "label") {
+    sections.push(
+      ...labelGroups.map((group) => ({
+        workspaces: group.rows,
+        collapsed: input.collapsedStatusGroupKeys.has(group.key),
       })),
     );
   } else {
@@ -71,6 +89,7 @@ export function buildSidebarProjection(input: {
   return {
     pinnedGroups,
     statusGroups,
+    labelGroups,
     shortcutModel: buildSidebarShortcutSections({ sections }),
   };
 }

@@ -174,6 +174,7 @@ interface RenderOptions {
   onClose?: () => void;
   onSubmit?: (value: string) => Promise<void> | void;
   validate?: (value: string) => string | null;
+  allowEmpty?: boolean;
   maxLength?: number;
 }
 
@@ -187,6 +188,7 @@ function renderModal(options: RenderOptions = {}): void {
     onClose = vi.fn(),
     onSubmit = vi.fn(),
     validate,
+    allowEmpty,
     maxLength,
   } = options;
   act(() => {
@@ -200,6 +202,7 @@ function renderModal(options: RenderOptions = {}): void {
         onClose={onClose}
         onSubmit={onSubmit}
         validate={validate}
+        allowEmpty={allowEmpty}
         maxLength={maxLength}
         testID="rename-modal"
       />,
@@ -309,6 +312,20 @@ describe("RenameModal", () => {
     typeInto("main");
     await flush();
     expect(querySubmit()?.disabled).toBe(true);
+  });
+
+  it("allows an existing value to be cleared when allowEmpty is set", async () => {
+    const onSubmit = vi.fn();
+    const onClose = vi.fn();
+    renderModal({ initialValue: "frontend", allowEmpty: true, onSubmit, onClose });
+
+    typeInto("");
+    expect(querySubmit()?.disabled).toBe(false);
+    click(querySubmit());
+    await flush();
+
+    expect(onSubmit).toHaveBeenCalledWith("");
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces validate errors inline and blocks submission", async () => {

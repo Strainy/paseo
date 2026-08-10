@@ -4,6 +4,7 @@ import type {
   SidebarWorkspaceEntry,
   SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
+import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { buildSidebarProjection } from "./sidebar-projection";
 
 function makeWorkspace(id: string, statusBucket: SidebarWorkspaceEntry["statusBucket"] = "done") {
@@ -22,6 +23,7 @@ function makeWorkspace(id: string, statusBucket: SidebarWorkspaceEntry["statusBu
     workspaceDirectory: "",
     workspaceDirectoryLabel: "",
     title: null,
+    labels: [],
     currentBranch: null,
     statusBucket,
     statusEnteredAt: null,
@@ -54,10 +56,7 @@ function makeProject(workspaces: SidebarWorkspacePlacement[]): SidebarProjectEnt
   };
 }
 
-function projectionInput(options?: {
-  groupMode?: "project" | "status";
-  pinnedCollapsed?: boolean;
-}) {
+function projectionInput(options?: { groupMode?: SidebarGroupMode; pinnedCollapsed?: boolean }) {
   const pinned = makeWorkspace("pinned", "running");
   const unpinned = makeWorkspace("unpinned", "needs_input");
   return {
@@ -76,6 +75,7 @@ function projectionInput(options?: {
     pinnedCollapsed: options?.pinnedCollapsed ?? false,
     collapsedProjectKeys: new Set<string>(),
     collapsedStatusGroupKeys: new Set<string>(),
+    unlabeledLabel: "Unlabeled",
   };
 }
 
@@ -101,6 +101,21 @@ describe("buildSidebarProjection", () => {
     expect(projection.statusGroups[0]?.rows.map((entry) => entry.workspaceId)).toEqual([
       "unpinned",
     ]);
+    expect(projection.shortcutModel.shortcutTargets).toEqual([
+      { serverId: "srv", workspaceId: "pinned" },
+      { serverId: "srv", workspaceId: "unpinned" },
+    ]);
+  });
+
+  it("keeps pinned chats above label groups and removes them from those groups", () => {
+    const input = projectionInput({ groupMode: "label" });
+    const unpinned = input.workspaceEntriesByKey.get("srv:unpinned");
+    if (unpinned) unpinned.labels = ["urgent"];
+
+    const projection = buildSidebarProjection(input);
+
+    expect(projection.labelGroups.map((group) => group.label)).toEqual(["urgent"]);
+    expect(projection.labelGroups[0]?.rows.map((entry) => entry.workspaceId)).toEqual(["unpinned"]);
     expect(projection.shortcutModel.shortcutTargets).toEqual([
       { serverId: "srv", workspaceId: "pinned" },
       { serverId: "srv", workspaceId: "unpinned" },

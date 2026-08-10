@@ -970,6 +970,19 @@ export const WorkspaceTitleSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const WorkspaceLabelsSetRequestSchema = z.object({
+  type: z.literal("workspace.labels.set.request"),
+  workspaceId: z.string(),
+  labels: z.array(z.string()),
+  requestId: z.string(),
+});
+
+export const WorkspaceLabelDeleteRequestSchema = z.object({
+  type: z.literal("workspace.labels.delete.request"),
+  label: z.string(),
+  requestId: z.string(),
+});
+
 export const WorkspacePinSetRequestSchema = z.object({
   type: z.literal("workspace.pin.set.request"),
   workspaceId: z.string(),
@@ -1825,6 +1838,32 @@ export const WorkspaceTitleSetResponseSchema = z.object({
   payload: WorkspaceTitleSetResponsePayloadSchema,
 });
 
+export const WorkspaceLabelsSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  labels: z.array(z.string()),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceLabelsSetResponseSchema = z.object({
+  type: z.literal("workspace.labels.set.response"),
+  payload: WorkspaceLabelsSetResponsePayloadSchema,
+});
+
+export const WorkspaceLabelDeleteResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  label: z.string(),
+  accepted: z.boolean(),
+  updatedWorkspaceIds: z.array(z.string()),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceLabelDeleteResponseSchema = z.object({
+  type: z.literal("workspace.labels.delete.response"),
+  payload: WorkspaceLabelDeleteResponsePayloadSchema,
+});
+
 export const WorkspacePinSetResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -2349,6 +2388,8 @@ export const WorkspaceCreateRequestSchema = z.object({
   requestId: z.string(),
   // Optional user-set title applied to the created workspace.
   title: z.string().optional(),
+  // COMPAT(workspaceLabelsOnCreate): added in v0.3.0, remove optional after 2027-02-07.
+  labels: z.array(z.string()).optional(),
   // Optional prompt context for workspace-level name/branch generation.
   firstAgentContext: FirstAgentContextSchema.optional(),
   source: z.discriminatedUnion("kind", [
@@ -2852,6 +2893,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
+  WorkspaceLabelsSetRequestSchema,
+  WorkspaceLabelDeleteRequestSchema,
   WorkspacePinSetRequestSchema,
   WorkspaceRecoveryInspectRequestSchema,
   WorkspaceRecoveryRestoreRequestSchema,
@@ -3249,6 +3292,10 @@ export const ServerInfoStatusPayloadSchema = z
         providerSubagents: z.boolean().optional(),
         // COMPAT(workspacePinning): added in v0.1.107, remove gate after 2027-01-12.
         workspacePinning: z.boolean().optional(),
+        // COMPAT(workspaceLabels): added in v0.3.0, remove after 2027-02-07.
+        workspaceLabels: z.boolean().optional(),
+        // COMPAT(workspaceLabelDeletion): added in v0.3.0, remove after 2027-02-07.
+        workspaceLabelDeletion: z.boolean().optional(),
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: z.boolean().optional(),
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.
@@ -3586,6 +3633,8 @@ export const WorkspaceDescriptorPayloadSchema = z
     // its input and offer a "reset to branch name" action. Null means the name
     // is derived from the branch/directory.
     title: z.string().nullable().optional(),
+    // COMPAT(workspaceLabels): added in v0.3.0, remove optional after 2027-02-07.
+    labels: z.array(z.string()).optional(),
     // COMPAT(workspacePinning): added in v0.1.107, remove optional after 2027-01-12.
     pinnedAt: z.string().nullable().optional(),
     archivingAt: z.string().nullable().optional().default(null),
@@ -6024,6 +6073,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
+  WorkspaceLabelsSetResponseSchema,
+  WorkspaceLabelDeleteResponseSchema,
   WorkspacePinSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
@@ -6222,6 +6273,14 @@ export type WorkspaceTitleSetResponse = z.infer<typeof WorkspaceTitleSetResponse
 export type WorkspaceTitleSetResponsePayload = z.infer<
   typeof WorkspaceTitleSetResponsePayloadSchema
 >;
+export type WorkspaceLabelsSetResponse = z.infer<typeof WorkspaceLabelsSetResponseSchema>;
+export type WorkspaceLabelsSetResponsePayload = z.infer<
+  typeof WorkspaceLabelsSetResponsePayloadSchema
+>;
+export type WorkspaceLabelDeleteResponse = z.infer<typeof WorkspaceLabelDeleteResponseSchema>;
+export type WorkspaceLabelDeleteResponsePayload = z.infer<
+  typeof WorkspaceLabelDeleteResponsePayloadSchema
+>;
 export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSchema>;
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceRecoveryState = z.infer<typeof WorkspaceRecoveryStateSchema>;
@@ -6369,6 +6428,8 @@ export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
 export type ProjectIconSetRequest = z.infer<typeof ProjectIconSetRequestSchema>;
 export type ProjectRemoveRequest = z.infer<typeof ProjectRemoveRequestSchema>;
 export type WorkspaceTitleSetRequest = z.infer<typeof WorkspaceTitleSetRequestSchema>;
+export type WorkspaceLabelsSetRequest = z.infer<typeof WorkspaceLabelsSetRequestSchema>;
+export type WorkspaceLabelDeleteRequest = z.infer<typeof WorkspaceLabelDeleteRequestSchema>;
 export type WorkspacePinSetRequest = z.infer<typeof WorkspacePinSetRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;

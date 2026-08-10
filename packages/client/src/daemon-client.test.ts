@@ -2956,6 +2956,7 @@ test("sends first-agent prompt context with workspace.create.request", async () 
         prompt: "Fix login bug",
         attachments: [],
       },
+      labels: ["frontend", "urgent"],
     },
     "req-local-title",
   );
@@ -2973,6 +2974,7 @@ test("sends first-agent prompt context with workspace.create.request", async () 
       prompt: "Fix login bug",
       attachments: [],
     },
+    labels: ["frontend", "urgent"],
   });
 
   mock.triggerMessage(
