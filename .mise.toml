@@ -8,3 +8,16 @@ _.path = [
   "{{ env.HOME }}/.local/share/mise/installs/android-sdk/{{ vars.android_sdk_version }}/platform-tools",
   "{{ env.HOME }}/.local/share/mise/installs/android-sdk/{{ vars.android_sdk_version }}/emulator",
 ]
+
+[tasks."install:macos"]
+description = "Build, smoke-test, install, and open Paseo.app from this checkout"
+run = "./scripts/install-macos-from-source.sh"
+
+[tasks."install:remote-daemon"]
+description = "Build and install the Paseo daemon from this checkout on a remote SSH server"
+usage = '''
+arg "<ssh-target>" help="Remote SSH config host or user@host"
+'''
+run = '''
+./scripts/install-remote-daemon-from-source.sh "${usage_ssh_target:-}"
+'''
