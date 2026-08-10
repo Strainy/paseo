@@ -10,6 +10,32 @@ import {
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
+  test("parses whole-label deletion requests and responses", () => {
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "workspace.labels.delete.request",
+        requestId: "req-delete-label",
+        label: "urgent",
+      }),
+    ).toMatchObject({ type: "workspace.labels.delete.request", label: "urgent" });
+
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "workspace.labels.delete.response",
+        payload: {
+          requestId: "req-delete-label",
+          label: "urgent",
+          accepted: true,
+          updatedWorkspaceIds: ["ws-1", "ws-2"],
+          error: null,
+        },
+      }),
+    ).toMatchObject({
+      type: "workspace.labels.delete.response",
+      payload: { label: "urgent", updatedWorkspaceIds: ["ws-1", "ws-2"] },
+    });
+  });
+
   test("parses fetch_workspaces_request", () => {
     const parsed = SessionInboundMessageSchema.parse({
       type: "fetch_workspaces_request",
@@ -1110,6 +1136,7 @@ describe("workspace message schemas", () => {
     const newDirectory = WorkspaceCreateRequestSchema.parse({
       type: "workspace.create.request",
       requestId: "req-dir",
+      labels: ["frontend", "urgent"],
       source: {
         kind: "directory",
         path: "/tmp/repo",
@@ -1117,5 +1144,6 @@ describe("workspace message schemas", () => {
     });
     expect(newDirectory.type).toBe("workspace.create.request");
     expect(newDirectory.source.kind).toBe("directory");
+    expect(newDirectory.labels).toEqual(["frontend", "urgent"]);
   });
 });

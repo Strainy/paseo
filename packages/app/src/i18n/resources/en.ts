@@ -914,6 +914,8 @@ export const en = {
         label: "Grouping",
         project: "Project",
         status: "Status",
+        labelValue: "Label",
+        unlabeled: "Unlabeled",
       },
       titleSource: {
         label: "Title",
@@ -922,6 +924,7 @@ export const en = {
       },
       show: {
         label: "Show",
+        labels: "Labels",
         host: "Host",
         changeRequest: "Pull request",
         checks: "Checks",
@@ -1019,6 +1022,7 @@ export const en = {
         copyPath: "Copy path",
         copyBranchName: "Copy branch name",
         rename: "Rename workspace",
+        editLabels: "Edit labels",
         pin: "Pin to top",
         unpin: "Unpin",
         archive: "Archive",
@@ -1038,6 +1042,20 @@ export const en = {
         title: "Rename workspace",
         submit: "Rename",
         invalidBranchName: "Invalid branch name",
+      },
+      labels: {
+        title: "Edit labels",
+        inputPlaceholder: "Add label",
+        noMatches: "No labels match your search",
+        create: 'Create "{{labels}}"',
+        deleteAccessibility: 'Delete label "{{label}}"',
+        deleteTitle: "Delete label?",
+        deleteMessage:
+          'Delete "{{label}}" from every workspace on this host? This cannot be undone.',
+        deleteConfirm: "Delete",
+        deleteFailed: "Failed to delete label",
+        submit: "Save",
+        updateHost: "Update the host to use workspace labels.",
       },
       toasts: {
         workspacePathUnavailable: "Workspace path not available",

@@ -81,6 +81,7 @@ function createTestRegistries() {
       workspaces.set(id, updated);
       return updated;
     },
+    deleteLabel: async () => [],
     upsert: async (record: PersistedWorkspaceRecord) => {
       workspaces.set(record.workspaceId, record);
     },
@@ -702,6 +703,7 @@ describe("WorkspaceReconciliationService", () => {
       baseBranch: null,
       isPaseoOwnedWorktree: false,
       mainRepoRoot: null,
+      labels: [],
       createdAt: timestamp,
       updatedAt: expect.any(String),
       archivedAt: expect.any(String),

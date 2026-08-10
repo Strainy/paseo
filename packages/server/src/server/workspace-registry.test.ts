@@ -449,6 +449,35 @@ describe("workspace registries", () => {
     });
   });
 
+  test("deletes a label from every workspace in one registry mutation", async () => {
+    await workspaceRegistry.initialize();
+    for (const [workspaceId, labels] of [
+      ["ws-1", ["frontend", "urgent"]],
+      ["ws-2", ["urgent"]],
+      ["ws-3", ["backend"]],
+    ] as const) {
+      await workspaceRegistry.upsert(
+        createPersistedWorkspaceRecord({
+          workspaceId,
+          projectId: "proj-1",
+          cwd: `/tmp/${workspaceId}`,
+          kind: "directory",
+          displayName: workspaceId,
+          labels: [...labels],
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        }),
+      );
+    }
+
+    const updated = await workspaceRegistry.deleteLabel("urgent", "2026-03-04T00:00:00.000Z");
+
+    expect(updated.map((workspace) => workspace.workspaceId)).toEqual(["ws-1", "ws-2"]);
+    expect((await workspaceRegistry.get("ws-1"))?.labels).toEqual(["frontend"]);
+    expect((await workspaceRegistry.get("ws-2"))?.labels).toEqual([]);
+    expect((await workspaceRegistry.get("ws-3"))?.labels).toEqual(["backend"]);
+  });
+
   test("composes concurrent workspace field updates without losing either change", async () => {
     await workspaceRegistry.initialize();
     await workspaceRegistry.upsert(

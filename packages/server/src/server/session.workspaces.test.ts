@@ -8109,6 +8109,153 @@ test("workspace.title.set.request stores the title and emits an updated descript
   });
 });
 
+test("workspace.labels.set.request stores normalized labels and emits an updated descriptor", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const project = createPersistedProjectRecord({
+    projectId: "proj-1",
+    rootPath: REPO_CWD,
+    kind: "git",
+    displayName: "acme/repo",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: project.projectId,
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const projects = new Map([[project.projectId, project]]);
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.projectRegistry.get = async (id: string) => projects.get(id) ?? null;
+  session.projectRegistry.list = async () => Array.from(projects.values());
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.get = async (id: string) => workspaces.get(id) ?? null;
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+  session.workspaceUpdatesSubscription = {
+    subscriptionId: "sub-workspaces",
+    filter: {},
+    isBootstrapping: false,
+    lastEmittedByWorkspaceId: new Map(),
+    pendingUpdatesByWorkspaceId: new Map(),
+  };
+
+  await session.handleMessage({
+    type: "workspace.labels.set.request",
+    workspaceId: workspace.workspaceId,
+    labels: [" frontend ", "urgent", "frontend", ""],
+    requestId: "req-labels-1",
+  });
+
+  expect(findByType(emitted, "workspace.labels.set.response")?.payload).toEqual({
+    requestId: "req-labels-1",
+    workspaceId: workspace.workspaceId,
+    accepted: true,
+    labels: ["frontend", "urgent"],
+    error: null,
+  });
+  expect(workspaces.get(workspace.workspaceId)?.labels).toEqual(["frontend", "urgent"]);
+  expect(findByType(emitted, "workspace_update")?.payload).toMatchObject({
+    kind: "upsert",
+    workspace: { id: "ws-1", labels: ["frontend", "urgent"] },
+  });
+});
+
+test("workspace.labels.delete.request removes the label from every workspace", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const project = createPersistedProjectRecord({
+    projectId: "proj-1",
+    rootPath: REPO_CWD,
+    kind: "git",
+    displayName: "acme/repo",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const first = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: project.projectId,
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    labels: ["frontend", "urgent"],
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const second = createPersistedWorkspaceRecord({
+    workspaceId: "ws-2",
+    projectId: project.projectId,
+    cwd: `${REPO_CWD}/second`,
+    kind: "directory",
+    displayName: "second",
+    labels: ["urgent"],
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([
+    [first.workspaceId, first],
+    [second.workspaceId, second],
+  ]);
+  session.projectRegistry.get = async (id: string) => (id === project.projectId ? project : null);
+  session.workspaceRegistry.get = async (id: string) => workspaces.get(id) ?? null;
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.deleteLabel = async (label, updatedAt) => {
+    const updated = Array.from(workspaces.values()).flatMap((workspace) => {
+      if (!workspace.labels.includes(label)) return [];
+      const next = {
+        ...workspace,
+        labels: workspace.labels.filter((candidate) => candidate !== label),
+        updatedAt,
+      };
+      workspaces.set(next.workspaceId, next);
+      return [next];
+    });
+    return updated;
+  };
+  session.workspaceUpdatesSubscription = {
+    subscriptionId: "sub-workspaces",
+    filter: {},
+    isBootstrapping: false,
+    lastEmittedByWorkspaceId: new Map(),
+    pendingUpdatesByWorkspaceId: new Map(),
+  };
+
+  await session.handleMessage({
+    type: "workspace.labels.delete.request",
+    label: " urgent ",
+    requestId: "req-delete-label",
+  });
+
+  expect(findByType(emitted, "workspace.labels.delete.response")?.payload).toEqual({
+    requestId: "req-delete-label",
+    label: "urgent",
+    accepted: true,
+    updatedWorkspaceIds: ["ws-1", "ws-2"],
+    error: null,
+  });
+  expect(workspaces.get("ws-1")?.labels).toEqual(["frontend"]);
+  expect(workspaces.get("ws-2")?.labels).toEqual([]);
+  expect(
+    emitted
+      .filter((message) => message.type === "workspace_update")
+      .map((message) => message.payload.workspace?.id),
+  ).toEqual(["ws-1", "ws-2"]);
+});
+
 test("workspace.pin.set.request stores the pin timestamp and emits an updated descriptor", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = asTestSession(

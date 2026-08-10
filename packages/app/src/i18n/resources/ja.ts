@@ -915,6 +915,8 @@ export const ja: TranslationResources = {
         label: "グループ化",
         project: "プロジェクト",
         status: "ステータス",
+        labelValue: "ラベル",
+        unlabeled: "ラベルなし",
       },
       titleSource: {
         label: "タイトル",
@@ -923,6 +925,7 @@ export const ja: TranslationResources = {
       },
       show: {
         label: "表示項目",
+        labels: "ラベル",
         host: "ホスト",
         changeRequest: "プルリクエスト",
         checks: "チェック",
@@ -1020,6 +1023,7 @@ export const ja: TranslationResources = {
         copyPath: "パスをコピー",
         copyBranchName: "ブランチ名をコピー",
         rename: "ワークスペースの名前を変更",
+        editLabels: "ラベルを編集",
         pin: "上部に固定",
         unpin: "固定解除",
         archive: "アーカイブ",
@@ -1039,6 +1043,20 @@ export const ja: TranslationResources = {
         title: "ワークスペースの名前を変更",
         submit: "名前を変更",
         invalidBranchName: "無効なブランチ名",
+      },
+      labels: {
+        title: "ラベルを編集",
+        inputPlaceholder: "ラベルを追加",
+        noMatches: "一致するラベルはありません",
+        create: "「{{labels}}」を作成",
+        deleteAccessibility: "ラベル「{{label}}」を削除",
+        deleteTitle: "ラベルを削除しますか？",
+        deleteMessage:
+          "このホスト上のすべてのワークスペースから「{{label}}」を削除しますか？この操作は元に戻せません。",
+        deleteConfirm: "削除",
+        deleteFailed: "ラベルを削除できませんでした",
+        submit: "保存",
+        updateHost: "ワークスペースのラベルを使用するには、ホストを更新してください。",
       },
       toasts: {
         workspacePathUnavailable: "ワークスペースパスが利用できません",

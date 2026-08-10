@@ -926,6 +926,8 @@ export const ru: TranslationResources = {
         label: "Группировка",
         project: "Проект",
         status: "Статус",
+        labelValue: "Метка",
+        unlabeled: "Без метки",
       },
       titleSource: {
         label: "Заголовок",
@@ -934,6 +936,7 @@ export const ru: TranslationResources = {
       },
       show: {
         label: "Показывать",
+        labels: "Метки",
         host: "Хост",
         changeRequest: "Pull request",
         checks: "Проверки",
@@ -1031,6 +1034,7 @@ export const ru: TranslationResources = {
         copyPath: "Копировать путь",
         copyBranchName: "Скопировать название ветки",
         rename: "Переименовать рабочую область",
+        editLabels: "Изменить метки",
         pin: "Закрепить вверху",
         unpin: "Открепить",
         archive: "Архив",
@@ -1050,6 +1054,20 @@ export const ru: TranslationResources = {
         title: "Переименовать рабочую область",
         submit: "Переименовать",
         invalidBranchName: "Неверное название ветки",
+      },
+      labels: {
+        title: "Изменить метки",
+        inputPlaceholder: "Добавить метку",
+        noMatches: "Совпадающих меток нет",
+        create: 'Создать "{{labels}}"',
+        deleteAccessibility: 'Удалить метку "{{label}}"',
+        deleteTitle: "Удалить метку?",
+        deleteMessage:
+          'Удалить "{{label}}" из всех рабочих пространств на этом хосте? Это действие нельзя отменить.',
+        deleteConfirm: "Удалить",
+        deleteFailed: "Не удалось удалить метку",
+        submit: "Сохранить",
+        updateHost: "Обновите хост, чтобы использовать метки рабочего пространства.",
       },
       toasts: {
         workspacePathUnavailable: "Путь Workspace недоступен",
