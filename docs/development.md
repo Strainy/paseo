@@ -38,6 +38,28 @@ Linux produces the `paseo-desktop` launcher and desktop entry. macOS produces
 Electron runtime and the checkout's built daemon, client, and renderer rather
 than downloading a published desktop release.
 
+## Install source builds
+
+Use the repository-local mise tasks to replace a development installation with
+the current checkout:
+
+```bash
+mise run install:macos
+mise run install:remote-daemon -- dev-server
+```
+
+`install:macos` builds and smoke-tests the native architecture, moves the
+existing `/Applications/Paseo.app` to the Trash, installs the new app, and opens
+it. Set `PASEO_MACOS_INSTALL_DIR` when the app lives elsewhere.
+
+`install:remote-daemon` accepts an SSH config host or `user@host`. It builds the
+internal npm packages, installs them with the remote user's npm prefix, and
+restarts the existing remote daemon with its current home and listen address.
+The remote host must already have Node.js, npm, and an npm-installed Paseo CLI.
+The task sources `~/.profile` before its preflight and installation commands.
+Configure the remote account's Node.js version manager there; interactive-only
+shell setup is not available over the task's non-interactive SSH connection.
+
 ### PASEO_HOME
 
 `PASEO_HOME` is the directory that holds runtime state (agents, worktrees, workspace config, sockets, daemon log). Resolution rules:
