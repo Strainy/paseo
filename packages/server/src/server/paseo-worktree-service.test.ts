@@ -1068,6 +1068,7 @@ function createDeps(options?: {
       workspaces.set(workspaceId, updated);
       return updated;
     },
+    deleteLabel: async () => [],
     upsert: async (record) => {
       events.push(`workspace:${record.workspaceId}`);
       workspaces.set(record.workspaceId, record);

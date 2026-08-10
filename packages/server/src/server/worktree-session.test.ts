@@ -348,6 +348,7 @@ function createPaseoWorktreeForTest(options: {
       workspaces.set(workspaceId, updated);
       return updated;
     },
+    deleteLabel: async () => [],
     upsert: async (record) => {
       options.events?.push(`workspace:${record.workspaceId}`);
       workspaces.set(record.workspaceId, record);

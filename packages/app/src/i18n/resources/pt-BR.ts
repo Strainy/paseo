@@ -926,6 +926,8 @@ export const ptBR: TranslationResources = {
         label: "Agrupamento",
         project: "Projeto",
         status: "Status",
+        labelValue: "Rótulo",
+        unlabeled: "Sem rótulo",
       },
       titleSource: {
         label: "Título",
@@ -934,6 +936,7 @@ export const ptBR: TranslationResources = {
       },
       show: {
         label: "Mostrar",
+        labels: "Rótulos",
         host: "Host",
         changeRequest: "Pull request",
         checks: "Verificações",
@@ -1031,6 +1034,7 @@ export const ptBR: TranslationResources = {
         copyPath: "Copiar caminho",
         copyBranchName: "Copiar nome da branch",
         rename: "Renomear workspace",
+        editLabels: "Editar rótulos",
         pin: "Fixar no topo",
         unpin: "Desafixar",
         archive: "Arquivar",
@@ -1050,6 +1054,20 @@ export const ptBR: TranslationResources = {
         title: "Renomear workspace",
         submit: "Renomear",
         invalidBranchName: "Nome de branch inválido",
+      },
+      labels: {
+        title: "Editar rótulos",
+        inputPlaceholder: "Adicionar rótulo",
+        noMatches: "Nenhum rótulo correspondente",
+        create: 'Criar "{{labels}}"',
+        deleteAccessibility: 'Excluir o rótulo "{{label}}"',
+        deleteTitle: "Excluir rótulo?",
+        deleteMessage:
+          'Excluir "{{label}}" de todos os workspaces deste host? Esta ação não pode ser desfeita.',
+        deleteConfirm: "Excluir",
+        deleteFailed: "Falha ao excluir o rótulo",
+        submit: "Salvar",
+        updateHost: "Atualize o host para usar rótulos de workspace.",
       },
       toasts: {
         workspacePathUnavailable: "Caminho do workspace indisponível",

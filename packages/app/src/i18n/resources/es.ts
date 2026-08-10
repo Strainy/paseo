@@ -935,6 +935,8 @@ export const es: TranslationResources = {
         label: "Agrupación",
         project: "Proyecto",
         status: "Estado",
+        labelValue: "Etiqueta",
+        unlabeled: "Sin etiqueta",
       },
       titleSource: {
         label: "Título",
@@ -943,6 +945,7 @@ export const es: TranslationResources = {
       },
       show: {
         label: "Mostrar",
+        labels: "Etiquetas",
         host: "Host",
         changeRequest: "Pull request",
         checks: "Comprobaciones",
@@ -1040,6 +1043,7 @@ export const es: TranslationResources = {
         copyPath: "Copiar ruta",
         copyBranchName: "Copiar nombre de sucursal",
         rename: "Cambiar nombre del espacio de trabajo",
+        editLabels: "Editar etiquetas",
         pin: "Anclar arriba",
         unpin: "Desanclar",
         archive: "Archivo",
@@ -1059,6 +1063,20 @@ export const es: TranslationResources = {
         title: "Cambiar nombre del espacio de trabajo",
         submit: "Rebautizar",
         invalidBranchName: "Nombre de sucursal no válido",
+      },
+      labels: {
+        title: "Editar etiquetas",
+        inputPlaceholder: "Añadir etiqueta",
+        noMatches: "No hay etiquetas coincidentes",
+        create: 'Crear "{{labels}}"',
+        deleteAccessibility: 'Eliminar la etiqueta "{{label}}"',
+        deleteTitle: "¿Eliminar etiqueta?",
+        deleteMessage:
+          '¿Eliminar "{{label}}" de todos los espacios de trabajo de este host? Esta acción no se puede deshacer.',
+        deleteConfirm: "Eliminar",
+        deleteFailed: "No se pudo eliminar la etiqueta",
+        submit: "Guardar",
+        updateHost: "Actualiza el host para usar etiquetas del espacio de trabajo.",
       },
       toasts: {
         workspacePathUnavailable: "RutaWorkspaceno disponible",

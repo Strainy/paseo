@@ -904,6 +904,8 @@ export const ar: TranslationResources = {
         label: "التجميع",
         project: "المشروع",
         status: "الحالة",
+        labelValue: "التسمية",
+        unlabeled: "بلا تسمية",
       },
       titleSource: {
         label: "العنوان",
@@ -912,6 +914,7 @@ export const ar: TranslationResources = {
       },
       show: {
         label: "إظهار",
+        labels: "التسميات",
         host: "المضيف",
         changeRequest: "طلب السحب",
         checks: "الفحوصات",
@@ -1009,6 +1012,7 @@ export const ar: TranslationResources = {
         copyPath: "نسخ المسار",
         copyBranchName: "انسخ اسم الفرع",
         rename: "إعادة تسمية مساحة العمل",
+        editLabels: "تحرير التسميات",
         pin: "تثبيت في الأعلى",
         unpin: "إلغاء التثبيت",
         archive: "أرشيف",
@@ -1028,6 +1032,20 @@ export const ar: TranslationResources = {
         title: "إعادة تسمية مساحة العمل",
         submit: "إعادة تسمية",
         invalidBranchName: "اسم الفرع غير صالح",
+      },
+      labels: {
+        title: "تعديل التسميات",
+        inputPlaceholder: "إضافة تسمية",
+        noMatches: "لا توجد تسميات مطابقة",
+        create: 'إنشاء "{{labels}}"',
+        deleteAccessibility: 'حذف التسمية "{{label}}"',
+        deleteTitle: "حذف التسمية؟",
+        deleteMessage:
+          'حذف "{{label}}" من جميع مساحات العمل على هذا المضيف؟ لا يمكن التراجع عن هذا الإجراء.',
+        deleteConfirm: "حذف",
+        deleteFailed: "تعذر حذف التسمية",
+        submit: "حفظ",
+        updateHost: "حدّث المضيف لاستخدام تسميات مساحة العمل.",
       },
       toasts: {
         workspacePathUnavailable: "مسار Workspace غير متوفر",

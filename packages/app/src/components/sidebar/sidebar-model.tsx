@@ -6,6 +6,8 @@ import {
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarWorkspaceEntries } from "@/hooks/use-sidebar-workspace-entries";
 import type { StatusGroup } from "@/hooks/sidebar-status-view-model";
+import type { LabelGroup } from "@/hooks/sidebar-label-view-model";
+import { useTranslation } from "react-i18next";
 import { usePinnedSidebarKeys, type PinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
 import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
@@ -16,6 +18,7 @@ interface SidebarModel extends SidebarWorkspacesListResult {
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   groupMode: SidebarGroupMode;
   statusGroups: StatusGroup[];
+  labelGroups: LabelGroup[];
   pinnedGroups: PinnedSidebarGroups;
   collapsedProjectKeys: ReadonlySet<string>;
   toggleProjectCollapsed: (projectViewKey: string) => void;
@@ -32,6 +35,7 @@ export function SidebarModelProvider({
   active?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const list = useSidebarWorkspacesList();
   const groupMode = useSidebarViewStore((state) => state.groupMode);
   const collapsedProjectKeys = useSidebarCollapsedSectionsStore(
@@ -44,12 +48,12 @@ export function SidebarModelProvider({
   const toggleProjectCollapsed = useSidebarCollapsedSectionsStore(
     (state) => state.toggleProjectCollapsed,
   );
-  const isStatusMode = groupMode === "status";
+  const isGroupedMode = groupMode !== "project";
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
-    active !== false || isStatusMode,
+    active !== false || isGroupedMode,
   );
-  const projectionWorkspaceEntriesByKey = isStatusMode
+  const projectionWorkspaceEntriesByKey = isGroupedMode
     ? workspaceEntriesByKey
     : EMPTY_WORKSPACE_ENTRIES;
   const pinnedKeys = usePinnedSidebarKeys(list.projects);
@@ -64,6 +68,7 @@ export function SidebarModelProvider({
         pinnedCollapsed,
         collapsedProjectKeys,
         collapsedStatusGroupKeys,
+        unlabeledLabel: t("sidebar.display.grouping.unlabeled"),
       }),
     [
       collapsedProjectKeys,
@@ -74,6 +79,7 @@ export function SidebarModelProvider({
       pinnedCollapsed,
       pinnedKeys,
       projectionWorkspaceEntriesByKey,
+      t,
     ],
   );
   const value = useMemo(
@@ -82,6 +88,7 @@ export function SidebarModelProvider({
       workspaceEntriesByKey,
       groupMode,
       statusGroups: projection.statusGroups,
+      labelGroups: projection.labelGroups,
       pinnedGroups: projection.pinnedGroups,
       collapsedProjectKeys,
       toggleProjectCollapsed,

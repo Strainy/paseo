@@ -290,6 +290,7 @@ function createNoopWorkspaceRegistry(): WorkspaceRegistry {
     list: async () => [],
     get: async () => null,
     update: async () => null,
+    deleteLabel: async () => [],
     upsert: async () => {},
     archive: async () => {},
     remove: async () => {},
@@ -1586,6 +1587,10 @@ export class VoiceAssistantWebSocketServer {
         providerSubagents: true,
         // COMPAT(workspacePinning): added in v0.1.107, remove gate after 2027-01-12.
         workspacePinning: true,
+        // COMPAT(workspaceLabels): added in v0.3.0, remove after 2027-02-07.
+        workspaceLabels: true,
+        // COMPAT(workspaceLabelDeletion): added in v0.3.0, remove after 2027-02-07.
+        workspaceLabelDeletion: true,
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: true,
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.

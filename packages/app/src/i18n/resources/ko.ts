@@ -911,6 +911,8 @@ export const ko: TranslationResources = {
         label: "그룹화",
         project: "프로젝트",
         status: "상태",
+        labelValue: "레이블",
+        unlabeled: "레이블 없음",
       },
       titleSource: {
         label: "제목",
@@ -919,6 +921,7 @@ export const ko: TranslationResources = {
       },
       show: {
         label: "표시 항목",
+        labels: "레이블",
         host: "호스트",
         changeRequest: "풀 리퀘스트",
         checks: "검사",
@@ -1016,6 +1019,7 @@ export const ko: TranslationResources = {
         copyPath: "경로 복사",
         copyBranchName: "브랜치 이름 복사",
         rename: "워크스페이스 이름 변경",
+        editLabels: "레이블 편집",
         pin: "상단에 고정",
         unpin: "고정 해제",
         archive: "보관",
@@ -1035,6 +1039,20 @@ export const ko: TranslationResources = {
         title: "워크스페이스 이름 변경",
         submit: "이름 변경",
         invalidBranchName: "잘못된 브랜치 이름",
+      },
+      labels: {
+        title: "레이블 편집",
+        inputPlaceholder: "레이블 추가",
+        noMatches: "일치하는 레이블 없음",
+        create: '"{{labels}}" 만들기',
+        deleteAccessibility: '"{{label}}" 레이블 삭제',
+        deleteTitle: "레이블을 삭제할까요?",
+        deleteMessage:
+          '이 호스트의 모든 워크스페이스에서 "{{label}}"을(를) 삭제할까요? 이 작업은 취소할 수 없습니다.',
+        deleteConfirm: "삭제",
+        deleteFailed: "레이블을 삭제하지 못했습니다",
+        submit: "저장",
+        updateHost: "워크스페이스 레이블을 사용하려면 호스트를 업데이트하세요.",
       },
       toasts: {
         workspacePathUnavailable: "워크스페이스 경로를 사용할 수 없습니다",

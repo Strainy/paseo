@@ -54,6 +54,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  labels: z.array(z.string()).optional().default([]),
   // The worktree's git branch. Decoupled from displayName/title by construction:
   // displayName holds the human name (title), branch holds the git branch. Only
   // worktree workspaces carry a branch; directory/local_checkout leave it null.
@@ -150,6 +151,7 @@ export interface WorkspaceRegistry {
     workspaceId: string,
     updater: (record: PersistedWorkspaceRecord) => PersistedWorkspaceRecord,
   ): Promise<PersistedWorkspaceRecord | null>;
+  deleteLabel(label: string, updatedAt: string): Promise<PersistedWorkspaceRecord[]>;
   upsert(record: PersistedWorkspaceRecord, context?: WorkspaceMutationContext): Promise<void>;
   archive(
     workspaceId: string,
@@ -230,6 +232,24 @@ class FileBackedRegistry<TRecord extends RegistryRecord> {
     this.cache.set(id, next);
     await this.enqueuePersist();
     return next;
+  }
+
+  protected async updateMatching(
+    predicate: (record: TRecord) => boolean,
+    updater: (record: TRecord) => TRecord,
+  ): Promise<TRecord[]> {
+    await this.load();
+    const updated: TRecord[] = [];
+    for (const existing of this.cache.values()) {
+      if (!predicate(existing)) continue;
+      const next = this.schema.parse(updater(existing));
+      this.cache.set(this.getId(next), next);
+      updated.push(next);
+    }
+    if (updated.length > 0) {
+      await this.enqueuePersist();
+    }
+    return updated;
   }
 
   async archive(id: string, archivedAt: string): Promise<void> {
@@ -473,6 +493,23 @@ export class FileBackedWorkspaceRegistry
     return workspace;
   }
 
+  async deleteLabel(label: string, updatedAt: string): Promise<PersistedWorkspaceRecord[]> {
+    const workspaces = await this.updateMatching(
+      (workspace) => workspace.labels.includes(label),
+      (workspace) => ({
+        ...workspace,
+        labels: workspace.labels.filter((candidate) => candidate !== label),
+        updatedAt,
+      }),
+    );
+    await Promise.all(
+      workspaces.map((workspace) =>
+        this.notifyMutation({ kind: "upsert", workspaceId: workspace.workspaceId, workspace }),
+      ),
+    );
+    return workspaces;
+  }
+
   override async upsert(
     record: PersistedWorkspaceRecord,
     context?: WorkspaceMutationContext,
@@ -546,6 +583,7 @@ export function createPersistedWorkspaceRecord(input: {
   kind: PersistedWorkspaceKind;
   displayName: string;
   title?: string | null;
+  labels?: string[];
   branch?: string | null;
   worktreeRoot?: string | null;
   baseBranch?: string | null;
@@ -560,6 +598,7 @@ export function createPersistedWorkspaceRecord(input: {
   return PersistedWorkspaceRecordSchema.parse({
     ...input,
     title: input.title ?? null,
+    labels: input.labels ?? [],
     branch: input.branch ?? null,
     worktreeRoot: input.worktreeRoot ?? null,
     baseBranch: input.baseBranch ?? null,

@@ -934,6 +934,8 @@ export const fr: TranslationResources = {
         label: "Regroupement",
         project: "Projet",
         status: "Statut",
+        labelValue: "Étiquette",
+        unlabeled: "Sans étiquette",
       },
       titleSource: {
         label: "Titre",
@@ -942,6 +944,7 @@ export const fr: TranslationResources = {
       },
       show: {
         label: "Afficher",
+        labels: "Étiquettes",
         host: "Hôte",
         changeRequest: "Pull request",
         checks: "Vérifications",
@@ -1039,6 +1042,7 @@ export const fr: TranslationResources = {
         copyPath: "Copier le chemin",
         copyBranchName: "Copier le nom de la branche",
         rename: "Renommer l'espace de travail",
+        editLabels: "Modifier les étiquettes",
         pin: "Épingler en haut",
         unpin: "Désépingler",
         archive: "Archive",
@@ -1058,6 +1062,20 @@ export const fr: TranslationResources = {
         title: "Renommer l'espace de travail",
         submit: "Rebaptiser",
         invalidBranchName: "Nom de succursale invalide",
+      },
+      labels: {
+        title: "Modifier les étiquettes",
+        inputPlaceholder: "Ajouter une étiquette",
+        noMatches: "Aucune étiquette correspondante",
+        create: "Créer « {{labels}} »",
+        deleteAccessibility: "Supprimer l’étiquette « {{label}} »",
+        deleteTitle: "Supprimer l’étiquette ?",
+        deleteMessage:
+          "Supprimer « {{label}} » de tous les espaces de travail de cet hôte ? Cette action est irréversible.",
+        deleteConfirm: "Supprimer",
+        deleteFailed: "Impossible de supprimer l’étiquette",
+        submit: "Enregistrer",
+        updateHost: "Mettez à jour l’hôte pour utiliser les étiquettes d’espace de travail.",
       },
       toasts: {
         workspacePathUnavailable: "CheminWorkspacenon disponible",

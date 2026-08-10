@@ -720,6 +720,7 @@ function createPaseoWorktreeForMcpTest(options: {
       workspaces.set(workspaceId, updated);
       return updated;
     },
+    deleteLabel: async () => [],
     upsert: async (record: PersistedWorkspaceRecord) => {
       workspaces.set(record.workspaceId, record);
     },

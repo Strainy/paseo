@@ -108,11 +108,11 @@ describe("sidebar view store", () => {
   it("keeps current persisted sidebar view state during version migration", () => {
     expect(
       migrateSidebarViewState({
-        groupMode: "status",
+        groupMode: "label",
         hostFilters: ["host-a", "host-b"],
       }),
     ).toEqual({
-      groupMode: "status",
+      groupMode: "label",
       hostFilters: ["host-a", "host-b"],
     });
   });

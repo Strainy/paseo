@@ -157,6 +157,7 @@ export interface WorkspaceDescriptor {
   workspaceKind: WorkspaceDescriptorPayload["workspaceKind"];
   name: string;
   title?: string | null;
+  labels?: string[];
   pinnedAt?: string | null;
   status: WorkspaceDescriptorPayload["status"];
   statusEnteredAt: Date | null;
@@ -193,6 +194,7 @@ export function normalizeWorkspaceDescriptor(
     workspaceKind: payload.workspaceKind,
     name: payload.name,
     title: payload.title ?? null,
+    labels: payload.labels ?? [],
     pinnedAt: payload.pinnedAt ?? null,
     status: payload.status,
     statusEnteredAt,
