@@ -20,7 +20,7 @@ import {
 } from "lucide-react-native";
 import { Composer } from "@/composer";
 import { WorkspaceLabelsModal } from "@/components/workspace-labels-modal";
-import { ImportSessionSheet } from "@/components/import-session-sheet";
+import { ImportSessionSheet, type ImportSessionTarget } from "@/components/import-session-sheet";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import {
   resolveComposerAttachmentSubmitFormat,
@@ -130,7 +130,10 @@ import {
   resolveNewWorkspaceAutomaticServerId,
   resolveNewWorkspaceInitialServerId,
 } from "./new-workspace-initial-context";
-import { importedSessionWorkspaceNavigation } from "./new-workspace-import-session";
+import {
+  importedSessionWorkspaceNavigation,
+  resolveNewWorkspaceImportSessionTarget,
+} from "./new-workspace-import-session";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
 
 const ThemedFolderPlus = withUnistyles(FolderPlus);
@@ -401,6 +404,28 @@ function ImportSessionControl({
       </TooltipContent>
     </Tooltip>
   );
+}
+
+function isImportSessionControlDisabled(
+  isPending: boolean,
+  target: ImportSessionTarget | null,
+): boolean {
+  return isPending || target === null;
+}
+
+type NewWorkspaceImportSessionSheetProps = Omit<
+  React.ComponentProps<typeof ImportSessionSheet>,
+  "target"
+> & {
+  target: ImportSessionTarget | null;
+};
+
+function NewWorkspaceImportSessionSheet({
+  target,
+  ...props
+}: NewWorkspaceImportSessionSheetProps): ReactElement | null {
+  if (!target) return null;
+  return <ImportSessionSheet {...props} target={target} />;
 }
 
 function WorkspaceLabelsControl({
@@ -1460,6 +1485,7 @@ interface NewWorkspaceFormStackInput {
     disabled: boolean;
   };
   importSession: {
+    disabled: boolean;
     onOpen: () => void;
   };
   labels: {
@@ -1657,7 +1683,7 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
   const importSessionControl = (
     <ImportSessionControl
       onPress={importSession.onOpen}
-      disabled={isPending}
+      disabled={importSession.disabled}
       badgePressableStyle={badgePressableStyle}
       iconColor={theme.colors.foregroundMuted}
       iconSize={theme.iconSize.sm}
@@ -1816,6 +1842,15 @@ export function NewWorkspaceScreen({
     lastActiveProject,
     allowAllProjects: supportsWorkspaceMultiplicity,
   });
+  const importSessionTarget = useMemo(
+    () =>
+      resolveNewWorkspaceImportSessionTarget({
+        project: selectedProject,
+        providerContextCwd: selectedSourceDirectory,
+        serverId: selectedServerId,
+      }),
+    [selectedProject, selectedServerId, selectedSourceDirectory],
+  );
   const projectIconTargets = useMemo(
     () =>
       projects.flatMap((project) => {
@@ -2476,6 +2511,7 @@ export function NewWorkspaceScreen({
       disabled: isPending,
     },
     importSession: {
+      disabled: isImportSessionControlDisabled(isPending, importSessionTarget),
       onOpen: handleOpenImportSession,
     },
     labels: labelsControlInput({
@@ -2561,11 +2597,11 @@ export function NewWorkspaceScreen({
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         </ReanimatedAnimated.View>
       </View>
-      <ImportSessionSheet
+      <NewWorkspaceImportSessionSheet
         visible={importSessionOpen}
         client={client}
         serverId={selectedServerId}
-        cwd={selectedSourceDirectory}
+        target={importSessionTarget}
         onClose={handleCloseImportSession}
         onImported={handleImportedSession}
       />

@@ -31,9 +31,12 @@ import {
   type AgentUsage,
   type FetchCatalogOptions,
   type ImportableProviderSession,
+  type ImportableProviderSessionPage,
+  type ImportableSessionPager,
   type ImportProviderSessionContext,
   type ImportProviderSessionInput,
   type ListImportableSessionsOptions,
+  type OpenImportableSessionPagerOptions,
   type ProviderCatalog,
   type ProviderRefreshContext,
   type ResolveAgentDefaultModeInput,
@@ -69,7 +72,7 @@ import {
   findExecutable,
   probeExecutable,
 } from "../../../executable-resolution/executable-resolution.js";
-import { createPathEquivalenceMatcher } from "../../../utils/path.js";
+import { createRealpathAwarePathMatcher } from "../../../utils/path.js";
 import { spawnProcess } from "../../../utils/spawn.js";
 import { extractCodexTerminalSessionId, nonEmptyString } from "./tool-call-mapper-utils.js";
 import { buildCodexFeatures, codexModelSupportsFastMode } from "./codex-feature-definitions.js";
@@ -128,6 +131,11 @@ function isArchivedCodexThreadResumeError(error: unknown, threadId: string): boo
     `session ${threadId} is archived. ` +
     `Run \`codex unarchive ${threadId}\` to unarchive it first.`;
   return error.message === expectedMessage;
+}
+
+function isCodexThreadActiveWriterError(error: unknown, threadId: string): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes(`thread ${threadId} already has an active writer`);
 }
 
 function isCodexAlreadyUnarchivedError(error: unknown, threadId: string): boolean {
@@ -896,19 +904,123 @@ const CodexModelListResponseSchema = z.object({
     .optional(),
 });
 
-function filterCodexThreadsByCwd(
-  threads: Array<Record<string, unknown>>,
+function filterCodexSessionsByCwd(
+  sessions: ImportableProviderSession[],
   cwd: string | undefined,
-): Array<Record<string, unknown>> {
+): ImportableProviderSession[] {
   if (!cwd) {
-    return threads;
+    return sessions;
   }
-  // thread/list rows carry an optional cwd. The descriptor builder later
-  // falls back to process.cwd() if the field is missing, so we only match
-  // here when the row genuinely carries a cwd string — otherwise threads
-  // with no cwd would falsely match the daemon's own cwd.
-  const matchesCwd = createPathEquivalenceMatcher(cwd);
-  return threads.filter((thread) => typeof thread.cwd === "string" && matchesCwd(thread.cwd));
+  const matchesCwd = createRealpathAwarePathMatcher(cwd);
+  return sessions.filter((session) => matchesCwd(session.cwd));
+}
+
+const CodexImportableThreadSchema = z
+  .object({
+    id: z.string().min(1),
+    cwd: z.string().min(1),
+    preview: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+    createdAt: z.number().finite().optional(),
+    updatedAt: z.number().finite().optional(),
+  })
+  .refine((thread) => thread.updatedAt !== undefined || thread.createdAt !== undefined);
+
+const CodexImportableThreadPageSchema = z.object({
+  data: z.array(CodexImportableThreadSchema),
+  nextCursor: z.string().min(1).nullable(),
+});
+
+function parseCodexImportableThreadPage(value: unknown): ImportableProviderSessionPage {
+  const parsed = CodexImportableThreadPageSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("Codex thread/list returned an invalid thread row or cursor", {
+      cause: parsed.error,
+    });
+  }
+
+  return {
+    sessions: parsed.data.data.map((thread) => {
+      const activitySeconds = thread.updatedAt ?? thread.createdAt;
+      if (activitySeconds === undefined) {
+        throw new Error("Codex thread/list returned an invalid thread row");
+      }
+      const lastActivityAt = new Date(activitySeconds * 1_000);
+      if (Number.isNaN(lastActivityAt.getTime())) {
+        throw new Error("Codex thread/list returned an invalid thread row timestamp");
+      }
+      const preview = thread.preview ?? null;
+      const title = thread.name?.trim() ? thread.name : preview;
+      return {
+        providerHandleId: thread.id,
+        cwd: thread.cwd,
+        title,
+        firstPromptPreview: preview,
+        lastPromptPreview: preview,
+        lastActivityAt,
+      };
+    }),
+    nextCursor: parsed.data.nextCursor,
+  };
+}
+
+class CodexImportableSessionPager implements ImportableSessionPager {
+  private cursor: string | undefined;
+  private exhausted = false;
+  private closed = false;
+  private readonly seenCursors = new Set<string>();
+
+  constructor(
+    private readonly client: CodexAppServerClientLike,
+    cursor: string | undefined,
+  ) {
+    this.cursor = cursor;
+    if (cursor) this.seenCursors.add(cursor);
+  }
+
+  async next(limit: number): Promise<ImportableProviderSessionPage> {
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw new Error("Codex import session page limit must be a positive integer");
+    }
+    if (this.closed) {
+      throw new Error("Codex import session pager is closed");
+    }
+    if (this.exhausted) {
+      return { sessions: [], nextCursor: null };
+    }
+
+    const response = parseCodexImportableThreadPage(
+      await this.client.request("thread/list", {
+        ...(this.cursor ? { cursor: this.cursor } : {}),
+        limit,
+        sortKey: "updated_at",
+        sortDirection: "desc",
+      }),
+    );
+    if (response.sessions.length > limit) {
+      throw new Error("Codex thread/list returned more rows than requested");
+    }
+
+    const nextCursor = response.nextCursor;
+    if (nextCursor === null) {
+      this.cursor = undefined;
+      this.exhausted = true;
+    } else {
+      if (this.seenCursors.has(nextCursor)) {
+        throw new Error("Codex thread/list returned a repeated cursor");
+      }
+      this.seenCursors.add(nextCursor);
+      this.cursor = nextCursor;
+    }
+
+    return response;
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    await this.client.dispose();
+  }
 }
 
 export function toAgentUsage(tokenUsage: unknown): AgentUsage | undefined {
@@ -3812,6 +3924,12 @@ export class CodexAppServerAgentSession implements AgentSession {
         return;
       }
       this.logger.warn({ error, threadId }, "Failed to resume persisted Codex thread");
+      if (isCodexThreadActiveWriterError(error, threadId)) {
+        throw new Error(
+          "This Codex session is still open in another Codex client. Close it there, then try again.",
+          { cause: error },
+        );
+      }
       throw new Error(`Failed to resume Codex thread ${threadId}: ${message}`, { cause: error });
     }
   }
@@ -6824,6 +6942,20 @@ export class CodexAppServerAgentClient implements AgentClient {
   async listImportableSessions(
     options?: ListImportableSessionsOptions,
   ): Promise<ImportableProviderSession[]> {
+    const limit = options?.limit ?? 20;
+    const snapshotLimit = options?.cwd ? Math.max(limit, 50) : limit;
+    const pager = await this.openImportableSessionPager();
+    try {
+      const page = await pager.next(snapshotLimit);
+      return filterCodexSessionsByCwd(page.sessions, options?.cwd).slice(0, limit);
+    } finally {
+      await pager.close();
+    }
+  }
+
+  async openImportableSessionPager(
+    options?: OpenImportableSessionPagerOptions,
+  ): Promise<ImportableSessionPager> {
     const child = await this.spawnAppServer();
     const client =
       this.deps._createCodexClient?.(child, this.logger, () => ({})) ??
@@ -6832,41 +6964,10 @@ export class CodexAppServerAgentClient implements AgentClient {
     try {
       await client.request("initialize", buildCodexAppServerInitializeParams());
       client.notify("initialized", {});
-
-      const limit = options?.limit ?? 20;
-      // thread/list returns the cheap `cwd` field. Fetch a wider window when
-      // filtering since most threads will be from other cwds, then keep the
-      // local realpath-aware filter for symlink-equivalent workspace paths.
-      const listLimit = options?.cwd ? Math.max(limit, 50) : limit;
-      const response = toObjectRecord(
-        await client.request("thread/list", {
-          limit: listLimit,
-          ...(options?.cwd ? { cwd: options.cwd } : {}),
-        }),
-      );
-      const allThreads = Array.isArray(response?.data) ? response.data.filter(isRecord) : [];
-      const threads = filterCodexThreadsByCwd(allThreads, options?.cwd);
-      return threads.slice(0, limit).map((thread) => {
-        const threadId = typeof thread.id === "string" ? thread.id : "";
-        const cwd = typeof thread.cwd === "string" ? thread.cwd : process.cwd();
-        const preview = typeof thread.preview === "string" ? thread.preview : null;
-        const title = typeof thread.name === "string" && thread.name.trim() ? thread.name : preview;
-
-        return {
-          providerHandleId: threadId,
-          cwd,
-          title,
-          firstPromptPreview: preview,
-          lastPromptPreview: preview,
-          lastActivityAt: new Date(
-            ((typeof thread.updatedAt === "number" ? thread.updatedAt : undefined) ??
-              (typeof thread.createdAt === "number" ? thread.createdAt : undefined) ??
-              0) * 1000,
-          ),
-        };
-      });
-    } finally {
+      return new CodexImportableSessionPager(client, options?.cursor);
+    } catch (error) {
       await client.dispose();
+      throw error;
     }
   }
 

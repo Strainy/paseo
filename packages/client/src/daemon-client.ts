@@ -177,6 +177,7 @@ const PROJECT_GITHUB_CLONE_TIMEOUT_MS = 5 * 60 * 1000;
 interface ImportAgentInputBase {
   cwd?: string;
   workspaceId?: string;
+  projectId?: string;
   labels?: Record<string, string>;
 }
 
@@ -2061,14 +2062,20 @@ export class DaemonClient {
   async fetchRecentProviderSessions(
     options?: FetchRecentProviderSessionsOptions,
   ): Promise<FetchRecentProviderSessionsPayload> {
+    this.assertImportSessionProjectScopeSupported(options?.projectId);
+    if (options?.cursor && this.lastServerInfoMessage?.features?.importSessionPagination !== true) {
+      throw new Error("Update the host to load more importable sessions.");
+    }
     const resolvedRequestId = this.createRequestId(options?.requestId);
     const message = SessionInboundMessageSchema.parse({
       type: "fetch_recent_provider_sessions_request",
       requestId: resolvedRequestId,
       ...(options?.cwd ? { cwd: options.cwd } : {}),
+      ...(options?.projectId !== undefined ? { projectId: options.projectId } : {}),
       ...(options?.providers ? { providers: options.providers } : {}),
       ...(options?.since ? { since: options.since } : {}),
       ...(options?.limit ? { limit: options.limit } : {}),
+      ...(options?.cursor ? { cursor: options.cursor } : {}),
     });
     return this.sendRequest({
       requestId: resolvedRequestId,
@@ -2738,6 +2745,7 @@ export class DaemonClient {
   }
 
   async importAgent(input: ImportAgentInput): Promise<AgentSnapshotPayload> {
+    this.assertImportSessionProjectScopeSupported(input.projectId);
     const requestId = this.createRequestId();
     const message = SessionInboundMessageSchema.parse({
       type: "import_agent_request",
@@ -2747,6 +2755,7 @@ export class DaemonClient {
         : { provider: input.provider, sessionId: input.sessionId }),
       ...(input.cwd ? { cwd: input.cwd } : {}),
       ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+      ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
       ...(input.labels && Object.keys(input.labels).length > 0 ? { labels: input.labels } : {}),
     });
 
@@ -2777,6 +2786,15 @@ export class DaemonClient {
     }
 
     return status.agent;
+  }
+
+  private assertImportSessionProjectScopeSupported(projectId: string | undefined): void {
+    if (
+      projectId !== undefined &&
+      this.lastServerInfoMessage?.features?.importSessionProjectScope !== true
+    ) {
+      throw new Error("Update the host to import sessions from this project.");
+    }
   }
 
   async refreshAgent(agentId: string, requestId?: string): Promise<AgentRefreshedStatusPayload> {

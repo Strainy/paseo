@@ -535,6 +535,11 @@ export interface ListImportableSessionsOptions {
   cwd?: string;
 }
 
+export interface OpenImportableSessionPagerOptions {
+  /** Opaque provider-native cursor returned by the preceding page. */
+  cursor?: string;
+}
+
 export interface ImportableProviderSession {
   providerHandleId: string;
   cwd: string;
@@ -542,6 +547,24 @@ export interface ImportableProviderSession {
   firstPromptPreview: string | null;
   lastPromptPreview: string | null;
   lastActivityAt: Date;
+}
+
+export interface ImportableProviderSessionPage {
+  sessions: ImportableProviderSession[];
+  nextCursor: string | null;
+}
+
+/**
+ * Stateful import-session reader. Providers keep native listing resources open
+ * while the daemon drains rows through its own filters.
+ */
+export interface ImportableSessionPager {
+  /**
+   * Performs exactly one provider-native page read, returning at most `limit`
+   * rows and a lossless cursor after every consumed row.
+   */
+  next(limit: number): Promise<ImportableProviderSessionPage>;
+  close(): Promise<void>;
 }
 
 export interface ImportProviderSessionInput {
@@ -736,6 +759,9 @@ export interface AgentClient {
   listImportableSessions?(
     options?: ListImportableSessionsOptions,
   ): Promise<ImportableProviderSession[]>;
+  openImportableSessionPager?(
+    options?: OpenImportableSessionPagerOptions,
+  ): Promise<ImportableSessionPager>;
   importSession?(
     input: ImportProviderSessionInput,
     context: ImportProviderSessionContext,

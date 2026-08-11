@@ -10446,6 +10446,39 @@ class RecordingPersistedAgentsClient implements AgentClient {
   }
 }
 
+test("openImportableSessionPager targets one provider and preserves pager errors", async () => {
+  const baseClient = new RecordingPersistedAgentsClient("codex");
+  const close = vi.fn(async () => {});
+  const providerError = new Error("native page failed");
+  const client = Object.assign(baseClient, {
+    openImportableSessionPager: vi.fn(async (options?: { cursor?: string }) => ({
+      next: async (limit: number) => {
+        if (limit === 2) throw providerError;
+        return {
+          sessions: await baseClient.listImportableSessions(),
+          nextCursor: options?.cursor ?? null,
+        };
+      },
+      close,
+    })),
+  });
+  const manager = new AgentManager({
+    clients: { codex: client },
+    providerDefinitions: { codex: { enabled: true, derivedFromProviderId: null } },
+    logger,
+  });
+
+  const pager = await manager.openImportableSessionPager("codex", { cursor: "native-page-2" });
+  expect(pager).not.toBeNull();
+  await expect(pager?.next(1)).resolves.toMatchObject({
+    sessions: [{ provider: "codex", providerHandleId: "codex-session" }],
+    nextCursor: "native-page-2",
+  });
+  await expect(pager?.next(2)).rejects.toBe(providerError);
+  await pager?.close();
+  expect(close).toHaveBeenCalledOnce();
+});
+
 test.each([
   [
     "disabled",

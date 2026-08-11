@@ -478,6 +478,7 @@ function wrapClientProvider(
   profileModelsAreAdditive: boolean,
 ): AgentClient {
   const listImportableSessions = inner.listImportableSessions?.bind(inner);
+  const openImportableSessionPager = inner.openImportableSessionPager?.bind(inner);
   const importSession = inner.importSession?.bind(inner);
   const listFeatures = inner.listFeatures?.bind(inner);
 
@@ -539,6 +540,9 @@ function wrapClientProvider(
       : undefined,
     listImportableSessions: listImportableSessions
       ? async (options) => await listImportableSessions(options)
+      : undefined,
+    openImportableSessionPager: openImportableSessionPager
+      ? async (options) => await openImportableSessionPager(options)
       : undefined,
     importSession: importSession
       ? async (input, context) => {

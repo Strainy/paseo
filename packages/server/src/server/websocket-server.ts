@@ -231,6 +231,8 @@ function createFallbackWorkspaceGitService(): WorkspaceGitService {
     suggestBranchesForCwd: async () => [],
     listStashes: async () => [],
     listWorktrees: async () => [],
+    getGitCheckoutIdentity: async () => null,
+    listLinkedWorktrees: async () => [],
     getProjectSlug: async (cwd: string) => {
       const snapshot = createFallbackWorkspaceGitSnapshot(cwd);
       return deriveProjectSlug(cwd, snapshot.git.isGit ? snapshot.git.remoteUrl : null);
@@ -1734,6 +1736,10 @@ export class VoiceAssistantWebSocketServer {
         providerRemoval: true,
         // COMPAT(importSessionWorkspaceTarget): added in v0.1.110, remove gate after 2027-01-16.
         importSessionWorkspaceTarget: true,
+        // COMPAT(importSessionPagination): added in v0.3.2, remove gate after 2027-02-10.
+        importSessionPagination: true,
+        // COMPAT(importSessionProjectScope): added in v0.3.2, remove gate after 2027-02-10.
+        importSessionProjectScope: true,
         // COMPAT(forgeProviders): added in v0.1.106, drop the gate when daemon floor >= v0.1.106.
         forgeProviders: true,
         // COMPAT(selectiveAgentTimeline): added in v0.1.106, remove after 2027-01-12.

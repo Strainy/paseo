@@ -7,22 +7,92 @@ export const ALL_FILTER_VALUE = "__all__";
 
 export function requiresImportSessionsHostUpgrade(input: {
   supportsSnapshot: boolean;
-  workspaceId?: string | null;
+  targetKind: "host" | "project" | "workspace";
+  supportsProjectScope: boolean;
   supportsWorkspaceTarget: boolean;
 }): boolean {
-  return !input.supportsSnapshot || (Boolean(input.workspaceId) && !input.supportsWorkspaceTarget);
+  if (!input.supportsSnapshot) return true;
+  if (input.targetKind === "project") return !input.supportsProjectScope;
+  if (input.targetKind === "workspace") return !input.supportsWorkspaceTarget;
+  return false;
+}
+
+export interface SessionsPageData {
+  entries: FetchRecentProviderSessionEntry[];
+  filteredAlreadyImportedCount?: number;
+  nextCursor?: string | null;
 }
 
 export interface SessionsQueryResult {
-  data:
-    | {
-        entries: FetchRecentProviderSessionEntry[];
-        filteredAlreadyImportedCount?: number;
-      }
-    | undefined;
+  data: SessionsPageData | undefined;
   isError: boolean;
   isLoading: boolean;
   isPending: boolean;
+}
+
+function dedupeAndSortSessionEntries(
+  entryGroups: ReadonlyArray<ReadonlyArray<FetchRecentProviderSessionEntry>>,
+): FetchRecentProviderSessionEntry[] {
+  const seen = new Set<string>();
+  const collected: FetchRecentProviderSessionEntry[] = [];
+  for (const entries of entryGroups) {
+    for (const entry of entries) {
+      const key = `${entry.providerId}:${entry.providerHandleId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(entry);
+    }
+  }
+  collected.sort(
+    (a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime(),
+  );
+  return collected;
+}
+
+export function mergeSessionPages<T extends SessionsPageData>(
+  current: SessionsPageData,
+  next: T,
+): T {
+  const hasFilteredCount =
+    current.filteredAlreadyImportedCount !== undefined ||
+    next.filteredAlreadyImportedCount !== undefined;
+  return {
+    ...next,
+    entries: dedupeAndSortSessionEntries([current.entries, next.entries]),
+    ...(hasFilteredCount
+      ? {
+          filteredAlreadyImportedCount:
+            (current.filteredAlreadyImportedCount ?? 0) + (next.filteredAlreadyImportedCount ?? 0),
+        }
+      : {}),
+  };
+}
+
+export interface NextPageTarget {
+  provider: AgentProvider;
+  cursor: string;
+}
+
+export function collectNextPageTargets(input: {
+  supportsPagination: boolean;
+  selectedProvider: string;
+  providers: readonly AgentProvider[];
+  queries: ReadonlyArray<SessionsQueryResult>;
+}): NextPageTarget[] {
+  if (!input.supportsPagination) return [];
+
+  const targets: NextPageTarget[] = [];
+  for (let index = 0; index < input.providers.length; index++) {
+    const provider = input.providers[index];
+    if (input.selectedProvider !== ALL_FILTER_VALUE && provider !== input.selectedProvider) {
+      continue;
+    }
+    const cursor = input.queries[index]?.data?.nextCursor;
+    if (typeof cursor === "string" && cursor.length > 0) {
+      targets.push({ provider, cursor });
+    }
+  }
+  return targets;
 }
 
 export function resolveProvidersToFetch(
@@ -54,21 +124,9 @@ export function buildProviderLabelMap(
 export function aggregateSessionEntries(
   queries: ReadonlyArray<SessionsQueryResult>,
 ): FetchRecentProviderSessionEntry[] {
-  const seen = new Set<string>();
-  const collected: FetchRecentProviderSessionEntry[] = [];
-  for (const query of queries) {
-    if (!query.data) continue;
-    for (const entry of query.data.entries) {
-      const key = `${entry.providerId}:${entry.providerHandleId}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      collected.push(entry);
-    }
-  }
-  collected.sort(
-    (a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime(),
+  return dedupeAndSortSessionEntries(
+    queries.flatMap((query) => (query.data ? [query.data.entries] : [])),
   );
-  return collected;
 }
 
 export function sumFilteredAlreadyImportedCount(

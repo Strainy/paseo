@@ -25,6 +25,8 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useOpenProject } from "@/hooks/use-open-project";
 import type { Href } from "expo-router";
 
+const HOST_IMPORT_SESSION_TARGET = { kind: "host" } as const;
+
 export function OpenProjectScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -141,6 +143,7 @@ export function OpenProjectScreen() {
         visible={isImportSheetOpen}
         client={importClient}
         serverId={importServerId}
+        target={HOST_IMPORT_SESSION_TARGET}
         onClose={handleCloseImportSession}
         onImported={handleImported}
       />

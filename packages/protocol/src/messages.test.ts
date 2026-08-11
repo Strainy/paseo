@@ -344,6 +344,132 @@ describe("agent detach RPC", () => {
     }
     expect(parsed.features?.importSessionWorkspaceTarget).toBe(true);
   });
+
+  test("parses the import-session pagination feature gate", () => {
+    const parsed = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "srv-test",
+      features: {
+        importSessionPagination: true,
+      },
+    });
+
+    if (!parsed) {
+      throw new Error("Expected server info payload to parse");
+    }
+    expect(parsed.features?.importSessionPagination).toBe(true);
+  });
+
+  test("parses the project-scoped session import feature gate", () => {
+    const parsed = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "srv-test",
+      features: {
+        importSessionProjectScope: true,
+      },
+    });
+
+    if (!parsed) {
+      throw new Error("Expected server info payload to parse");
+    }
+    expect(parsed.features?.importSessionProjectScope).toBe(true);
+  });
+});
+
+describe("project-scoped provider session import compatibility", () => {
+  test("parses optional project ids on list and import requests", () => {
+    const listRequest = SessionInboundMessageSchema.parse({
+      type: "fetch_recent_provider_sessions_request",
+      requestId: "recent-project",
+      projectId: "project-lpu",
+    });
+    const importRequest = SessionInboundMessageSchema.parse({
+      type: "import_agent_request",
+      requestId: "import-project",
+      providerId: "codex",
+      providerHandleId: "thread-1",
+      cwd: "/tmp/lpu-worktree",
+      projectId: "project-lpu",
+    });
+
+    expect(listRequest).toMatchObject({ projectId: "project-lpu" });
+    expect(importRequest).toMatchObject({ projectId: "project-lpu" });
+  });
+
+  test("keeps project ids optional for older clients", () => {
+    const listRequest = SessionInboundMessageSchema.parse({
+      type: "fetch_recent_provider_sessions_request",
+      requestId: "recent-global",
+    });
+    const importRequest = SessionInboundMessageSchema.parse({
+      type: "import_agent_request",
+      requestId: "import-global",
+      providerId: "codex",
+      providerHandleId: "thread-1",
+      cwd: "/tmp/repo",
+    });
+
+    expect(listRequest.projectId).toBeUndefined();
+    expect(importRequest.projectId).toBeUndefined();
+  });
+
+  test("rejects an explicitly empty project id instead of widening scope", () => {
+    expect(
+      SessionInboundMessageSchema.safeParse({
+        type: "fetch_recent_provider_sessions_request",
+        requestId: "recent-empty-project",
+        projectId: "",
+      }).success,
+    ).toBe(false);
+    expect(
+      SessionInboundMessageSchema.safeParse({
+        type: "import_agent_request",
+        requestId: "import-empty-project",
+        providerId: "codex",
+        providerHandleId: "thread-1",
+        cwd: "/tmp/lpu-worktree",
+        projectId: "",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("recent provider session pagination", () => {
+  test("parses optional cursor request and tri-state continuation response", () => {
+    const request = SessionInboundMessageSchema.parse({
+      type: "fetch_recent_provider_sessions_request",
+      requestId: "recent-page-2",
+      providers: ["codex"],
+      limit: 15,
+      cursor: "opaque-page-cursor",
+    });
+    const response = SessionOutboundMessageSchema.parse({
+      type: "fetch_recent_provider_sessions_response",
+      payload: {
+        requestId: "recent-page-2",
+        entries: [],
+        nextCursor: null,
+      },
+    });
+
+    expect(request).toMatchObject({ cursor: "opaque-page-cursor" });
+    expect(response).toMatchObject({ payload: { nextCursor: null } });
+  });
+
+  test("keeps nextCursor optional for snapshot-only providers and older daemons", () => {
+    const response = SessionOutboundMessageSchema.parse({
+      type: "fetch_recent_provider_sessions_response",
+      payload: {
+        requestId: "recent-snapshot",
+        entries: [],
+      },
+    });
+
+    if (response.type !== "fetch_recent_provider_sessions_response") {
+      throw new Error("Expected recent provider sessions response");
+    }
+    expect(response.payload.nextCursor).toBeUndefined();
+  });
 });
 
 describe("agent setting action responses", () => {

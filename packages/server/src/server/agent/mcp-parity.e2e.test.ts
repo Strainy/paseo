@@ -191,6 +191,10 @@ function createRecordingAgentClients(): Record<AgentProvider, AgentClient> {
       wrappedClient.listImportableSessions = async (options) =>
         await client.listImportableSessions!(options);
     }
+    if (client.openImportableSessionPager) {
+      wrappedClient.openImportableSessionPager = async (options) =>
+        await client.openImportableSessionPager!(options);
+    }
     if (client.importSession) {
       wrappedClient.importSession = async (input, context) =>
         await client.importSession!(input, context);

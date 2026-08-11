@@ -45,7 +45,9 @@ import {
   type AgentRuntimeInfo,
   type ImportedTimelineEntry,
   type ImportableProviderSession,
+  type ImportableProviderSessionPage,
   type ListImportableSessionsOptions,
+  type OpenImportableSessionPagerOptions,
 } from "./agent-sdk-types.js";
 import { buildArchivedAgentRecord, type ArchivedStoredAgentRecord } from "./agent-archive.js";
 import type { StoredAgentRecord, AgentStorage } from "./agent-storage.js";
@@ -217,6 +219,14 @@ export type ImportablePersistedAgentQueryOptions = ListImportableSessionsOptions
 
 export interface ManagedImportableProviderSession extends ImportableProviderSession {
   provider: AgentProvider;
+}
+
+export interface ManagedImportableSessionPager {
+  next(limit: number): Promise<{
+    sessions: ManagedImportableProviderSession[];
+    nextCursor: ImportableProviderSessionPage["nextCursor"];
+  }>;
+  close(): Promise<void>;
 }
 
 export type AgentAttentionCallback = (params: {
@@ -959,6 +969,33 @@ export class AgentManager {
     return sessions
       .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime())
       .slice(0, limit);
+  }
+
+  async openImportableSessionPager(
+    provider: AgentProvider,
+    options?: OpenImportableSessionPagerOptions,
+  ): Promise<ManagedImportableSessionPager | null> {
+    const client = this.clients.get(provider);
+    if (
+      !client ||
+      client.capabilities.supportsSessionListing !== true ||
+      !client.openImportableSessionPager ||
+      !this.isProviderImportable(provider, new Set([provider]))
+    ) {
+      return null;
+    }
+
+    const pager = await client.openImportableSessionPager(options);
+    return {
+      next: async (limit) => {
+        const page = await pager.next(limit);
+        return {
+          sessions: page.sessions.map((session) => ({ ...session, provider })),
+          nextCursor: page.nextCursor,
+        };
+      },
+      close: async () => await pager.close(),
+    };
   }
 
   private isProviderImportable(

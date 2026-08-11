@@ -4466,6 +4466,146 @@ test("fetches scoped recent provider sessions", async () => {
   });
 });
 
+test("fetches project-scoped sessions only when the daemon supports it", async () => {
+  const logger = createMockLogger();
+  const supported = createMockTransport();
+  const legacy = createMockTransport();
+  const supportedClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "recent_sessions_project_scope_supported",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => supported.transport,
+  });
+  const legacyClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "recent_sessions_project_scope_legacy",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => legacy.transport,
+  });
+  clients.push(supportedClient, legacyClient);
+
+  const supportedConnect = supportedClient.connect();
+  supported.triggerOpen({ features: { importSessionProjectScope: true } });
+  await supportedConnect;
+  const legacyConnect = legacyClient.connect();
+  legacy.triggerOpen();
+  await legacyConnect;
+
+  await expect(supportedClient.fetchRecentProviderSessions({ projectId: "" })).rejects.toThrow();
+  expect(supported.sent).toEqual([]);
+  await expect(
+    legacyClient.fetchRecentProviderSessions({ projectId: "project-lpu" }),
+  ).rejects.toThrow("Update the host to import sessions from this project.");
+  expect(legacy.sent).toEqual([]);
+
+  const promise = supportedClient.fetchRecentProviderSessions({
+    projectId: "project-lpu",
+    providers: ["codex"],
+  });
+  expect(supported.sent).toHaveLength(1);
+  const request = parseSentFrame(supported.sent[0]);
+  expect(request).toMatchObject({
+    type: "fetch_recent_provider_sessions_request",
+    projectId: "project-lpu",
+    providers: ["codex"],
+  });
+
+  supported.triggerMessage(
+    wrapSessionMessage({
+      type: "fetch_recent_provider_sessions_response",
+      payload: {
+        requestId: request.requestId,
+        entries: [],
+      },
+    }),
+  );
+  await expect(promise).resolves.toMatchObject({
+    requestId: request.requestId,
+    entries: [],
+  });
+});
+
+test("fetches the next recent provider sessions page only when the daemon supports it", async () => {
+  const logger = createMockLogger();
+  const supported = createMockTransport();
+  const legacy = createMockTransport();
+  const supportedClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "recent_sessions_pagination_supported",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => supported.transport,
+  });
+  const legacyClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "recent_sessions_pagination_legacy",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => legacy.transport,
+  });
+  clients.push(supportedClient, legacyClient);
+
+  const supportedConnect = supportedClient.connect();
+  supported.triggerOpen({ features: { importSessionPagination: true } });
+  await supportedConnect;
+  const legacyConnect = legacyClient.connect();
+  legacy.triggerOpen();
+  await legacyConnect;
+
+  await expect(
+    legacyClient.fetchRecentProviderSessions({
+      providers: ["codex"],
+      limit: 15,
+      cursor: "page-2",
+    }),
+  ).rejects.toThrow("Update the host to load more importable sessions.");
+  expect(legacy.sent).toEqual([]);
+
+  const promise = supportedClient.fetchRecentProviderSessions({
+    providers: ["codex"],
+    limit: 15,
+    cursor: "page-2",
+  });
+  expect(supported.sent).toHaveLength(1);
+  const request = JSON.parse(String(supported.sent[0])) as {
+    type: "session";
+    message: {
+      type: "fetch_recent_provider_sessions_request";
+      requestId: string;
+      providers: string[];
+      limit: number;
+      cursor: string;
+    };
+  };
+  expect(request.message).toMatchObject({
+    type: "fetch_recent_provider_sessions_request",
+    providers: ["codex"],
+    limit: 15,
+    cursor: "page-2",
+  });
+
+  supported.triggerMessage(
+    JSON.stringify({
+      type: "session",
+      message: {
+        type: "fetch_recent_provider_sessions_response",
+        payload: {
+          requestId: request.message.requestId,
+          entries: [],
+          nextCursor: null,
+        },
+      },
+    }),
+  );
+  await expect(promise).resolves.toEqual({
+    requestId: request.message.requestId,
+    entries: [],
+    nextCursor: null,
+  });
+});
+
 test("imports an agent by provider handle id", async () => {
   const logger = createMockLogger();
   const mock = createMockTransport();
@@ -4558,6 +4698,81 @@ test("imports an agent by provider handle id", async () => {
     id: "agent-1",
     provider: "custom-codex",
   });
+});
+
+test("imports into a project only when the daemon supports project scope", async () => {
+  const logger = createMockLogger();
+  const supported = createMockTransport();
+  const legacy = createMockTransport();
+  const supportedClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "import_project_scope_supported",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => supported.transport,
+  });
+  const legacyClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "import_project_scope_legacy",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => legacy.transport,
+  });
+  clients.push(supportedClient, legacyClient);
+
+  const supportedConnect = supportedClient.connect();
+  supported.triggerOpen({ features: { importSessionProjectScope: true } });
+  await supportedConnect;
+  const legacyConnect = legacyClient.connect();
+  legacy.triggerOpen();
+  await legacyConnect;
+
+  await expect(
+    supportedClient.importAgent({
+      providerId: "codex",
+      providerHandleId: "thread-empty-project",
+      cwd: "/tmp/lpu-worktree",
+      projectId: "",
+    }),
+  ).rejects.toThrow();
+  expect(supported.sent).toEqual([]);
+  await expect(
+    legacyClient.importAgent({
+      providerId: "codex",
+      providerHandleId: "thread-1",
+      cwd: "/tmp/lpu-worktree",
+      projectId: "project-lpu",
+    }),
+  ).rejects.toThrow("Update the host to import sessions from this project.");
+  expect(legacy.sent).toEqual([]);
+
+  const promise = supportedClient.importAgent({
+    providerId: "codex",
+    providerHandleId: "thread-1",
+    cwd: "/tmp/lpu-worktree",
+    projectId: "project-lpu",
+  });
+  expect(supported.sent).toHaveLength(1);
+  const request = parseSentFrame(supported.sent[0]);
+  expect(request).toMatchObject({
+    type: "import_agent_request",
+    providerId: "codex",
+    providerHandleId: "thread-1",
+    cwd: "/tmp/lpu-worktree",
+    projectId: "project-lpu",
+  });
+
+  supported.triggerMessage(
+    wrapSessionMessage({
+      type: "status",
+      payload: {
+        status: "agent_create_failed",
+        requestId: request.requestId,
+        error: "project import test sentinel",
+      },
+    }),
+  );
+  await expect(promise).rejects.toThrow("project import test sentinel");
 });
 
 test("uses server-provided dictation finish timeout budget", async () => {

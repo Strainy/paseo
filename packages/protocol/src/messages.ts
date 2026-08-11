@@ -1302,9 +1302,11 @@ export const FetchRecentProviderSessionsRequestMessageSchema = z.object({
   type: z.literal("fetch_recent_provider_sessions_request"),
   requestId: z.string(),
   cwd: z.string().optional(),
+  projectId: z.string().min(1).optional(),
   providers: z.array(z.string()).optional(),
   since: z.string().optional(),
   limit: z.number().int().positive().max(200).optional(),
+  cursor: z.string().min(1).max(8_192).optional(),
 });
 
 export const FetchAgentRequestMessageSchema = z.object({
@@ -1585,6 +1587,7 @@ export const ImportAgentRequestMessageSchema = z.object({
   providerHandleId: z.string().optional(),
   cwd: z.string().optional(),
   workspaceId: z.string().optional(),
+  projectId: z.string().min(1).optional(),
   labels: z.record(z.string(), z.string()).optional(),
   requestId: z.string(),
 });
@@ -3340,6 +3343,10 @@ export const ServerInfoStatusPayloadSchema = z
         providerRemoval: z.boolean().optional(),
         // COMPAT(importSessionWorkspaceTarget): added in v0.1.110, remove gate after 2027-01-16.
         importSessionWorkspaceTarget: z.boolean().optional(),
+        // COMPAT(importSessionPagination): added in v0.3.2, remove gate after 2027-02-10.
+        importSessionPagination: z.boolean().optional(),
+        // COMPAT(importSessionProjectScope): added in v0.3.2, remove gate after 2027-02-10.
+        importSessionProjectScope: z.boolean().optional(),
         // COMPAT(forgeProviders): added in v0.1.106, drop the gate when daemon floor >= v0.1.106.
         // Daemon advertises pluggable non-GitHub forge support (the forge registry);
         // the client gates non-GitHub setup UI on it.
@@ -3814,6 +3821,9 @@ export const FetchRecentProviderSessionsResponseMessageSchema = z.object({
     requestId: z.string(),
     entries: z.array(RecentProviderSessionDescriptorPayloadSchema),
     filteredAlreadyImportedCount: z.number().int().nonnegative().optional(),
+    // Absent means the provider only supports a bounded snapshot. Null means a
+    // pageable provider is exhausted; a string continues the same filtered query.
+    nextCursor: z.string().min(1).max(8_192).nullable().optional(),
   }),
 });
 

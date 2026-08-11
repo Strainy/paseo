@@ -4,10 +4,12 @@ import {
   aggregateSessionEntries,
   ALL_FILTER_VALUE,
   buildProviderLabelMap,
+  collectNextPageTargets,
   collectErroredProviderLabels,
   computeEmptyState,
   getPromptPreview,
   getSessionTitle,
+  mergeSessionPages,
   resolveProvidersToFetch,
   requiresImportSessionsHostUpgrade,
   type SessionsQueryResult,
@@ -76,7 +78,8 @@ describe("requiresImportSessionsHostUpgrade", () => {
     expect(
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
-        workspaceId: null,
+        targetKind: "host",
+        supportsProjectScope: false,
         supportsWorkspaceTarget: false,
       }),
     ).toBe(false);
@@ -86,14 +89,35 @@ describe("requiresImportSessionsHostUpgrade", () => {
     expect(
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
-        workspaceId: "ws-current",
+        targetKind: "workspace",
+        supportsProjectScope: false,
         supportsWorkspaceTarget: false,
       }),
     ).toBe(true);
     expect(
       requiresImportSessionsHostUpgrade({
         supportsSnapshot: true,
-        workspaceId: "ws-current",
+        targetKind: "workspace",
+        supportsProjectScope: false,
+        supportsWorkspaceTarget: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("requires host support for imports opened from a project", () => {
+    expect(
+      requiresImportSessionsHostUpgrade({
+        supportsSnapshot: true,
+        targetKind: "project",
+        supportsProjectScope: false,
+        supportsWorkspaceTarget: true,
+      }),
+    ).toBe(true);
+    expect(
+      requiresImportSessionsHostUpgrade({
+        supportsSnapshot: true,
+        targetKind: "project",
+        supportsProjectScope: true,
         supportsWorkspaceTarget: true,
       }),
     ).toBe(false);
@@ -149,6 +173,98 @@ describe("aggregateSessionEntries", () => {
       }),
     ]);
     expect(result.map((e) => e.providerHandleId)).toEqual(["new", "old"]);
+  });
+});
+
+describe("mergeSessionPages", () => {
+  it("accumulates, dedupes, and sorts entries while advancing the cursor", () => {
+    const firstPage = {
+      entries: [
+        entry({ providerHandleId: "middle", lastActivityAt: "2026-04-30T10:00:00.000Z" }),
+        entry({ providerHandleId: "duplicate", lastActivityAt: "2026-04-30T09:00:00.000Z" }),
+      ],
+      filteredAlreadyImportedCount: 2,
+      nextCursor: "cursor-2",
+    };
+    const secondPage = {
+      entries: [
+        entry({ providerHandleId: "newest", lastActivityAt: "2026-04-30T11:00:00.000Z" }),
+        entry({ providerHandleId: "duplicate", lastActivityAt: "2026-04-30T08:00:00.000Z" }),
+      ],
+      filteredAlreadyImportedCount: 3,
+      nextCursor: null,
+    };
+
+    const merged = mergeSessionPages(firstPage, secondPage);
+
+    expect(merged.entries.map((session) => session.providerHandleId)).toEqual([
+      "newest",
+      "middle",
+      "duplicate",
+    ]);
+    expect(merged.filteredAlreadyImportedCount).toBe(5);
+    expect(merged.nextCursor).toBeNull();
+  });
+
+  it("omits the filtered count when neither page reports one", () => {
+    const merged = mergeSessionPages(
+      { entries: [entry({ providerHandleId: "first" })], nextCursor: "cursor-2" },
+      { entries: [entry({ providerHandleId: "second" })], nextCursor: null },
+    );
+
+    expect(merged).not.toHaveProperty("filteredAlreadyImportedCount");
+  });
+});
+
+describe("collectNextPageTargets", () => {
+  const providers = ["claude", "codex"] as const;
+  const queries = [
+    settled({ entries: [], nextCursor: "claude-cursor" }),
+    settled({ entries: [], nextCursor: "codex-cursor" }),
+  ];
+
+  it("ignores cursors from hosts that do not advertise pagination", () => {
+    expect(
+      collectNextPageTargets({
+        supportsPagination: false,
+        selectedProvider: ALL_FILTER_VALUE,
+        providers,
+        queries,
+      }),
+    ).toEqual([]);
+  });
+
+  it("returns each pageable provider in the All filter", () => {
+    expect(
+      collectNextPageTargets({
+        supportsPagination: true,
+        selectedProvider: ALL_FILTER_VALUE,
+        providers,
+        queries,
+      }),
+    ).toEqual([
+      { provider: "claude", cursor: "claude-cursor" },
+      { provider: "codex", cursor: "codex-cursor" },
+    ]);
+  });
+
+  it("only advances the selected provider and excludes exhausted pages", () => {
+    expect(
+      collectNextPageTargets({
+        supportsPagination: true,
+        selectedProvider: "codex",
+        providers,
+        queries: [queries[0], settled({ entries: [], nextCursor: null })],
+      }),
+    ).toEqual([]);
+    expect(
+      collectNextPageTargets({
+        supportsPagination: true,
+        selectedProvider: "claude",
+        providers,
+        queries,
+      }),
+    ).toEqual([{ provider: "claude", cursor: "claude-cursor" }]);
   });
 });
 

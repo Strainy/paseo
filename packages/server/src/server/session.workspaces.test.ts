@@ -572,6 +572,7 @@ function createSessionForWorkspaceTests(
   const agentManager = asAgentManager({
     subscribe: () => () => {},
     listAgents: () => [],
+    openImportableSessionPager: async () => null,
     listProviderSubagentActivity: () => [],
     getAgent: () => null,
     archiveAgent: async () => ({ archivedAt: new Date().toISOString() }),
@@ -3220,6 +3221,121 @@ test("fetch_recent_provider_sessions_request lists importable provider sessions 
       },
     },
   ]);
+});
+
+test("fetch_recent_provider_sessions_request emits pageable continuation state", async () => {
+  const emitted: Array<{ type: string; payload: Record<string, unknown> }> = [];
+  const session = createSessionForWorkspaceTests();
+  const cursors: Array<string | undefined> = [];
+
+  session.emit = (message) =>
+    emitted.push(message as { type: string; payload: Record<string, unknown> });
+  session.agentManager.listAgents = () => [];
+  session.agentStorage.list = async () => [];
+  session.agentManager.openImportableSessionPager = async (_provider, options) => {
+    cursors.push(options?.cursor);
+    return {
+      next: async () =>
+        options?.cursor
+          ? { sessions: [], nextCursor: null }
+          : {
+              sessions: [
+                makeImportableProviderSession({
+                  provider: "codex",
+                  sessionId: "page-one",
+                  cwd: "/tmp/recent",
+                  title: "Page one",
+                  lastActivityAt: "2026-04-30T12:00:00.000Z",
+                }),
+              ],
+              nextCursor: "native-page-2",
+            },
+      close: async () => {},
+    };
+  };
+
+  await session.handleMessage({
+    type: "fetch_recent_provider_sessions_request",
+    requestId: "req-page-one",
+    providers: ["codex"],
+    limit: 1,
+  });
+  const firstCursor = emitted[0]?.payload.nextCursor;
+  expect(firstCursor).toEqual(expect.any(String));
+
+  await session.handleMessage({
+    type: "fetch_recent_provider_sessions_request",
+    requestId: "req-page-two",
+    providers: ["codex"],
+    limit: 1,
+    cursor: firstCursor as string,
+  });
+
+  expect(cursors).toEqual([undefined, "native-page-2"]);
+  expect(emitted[1]).toMatchObject({
+    type: "fetch_recent_provider_sessions_response",
+    payload: {
+      requestId: "req-page-two",
+      entries: [],
+      nextCursor: null,
+    },
+  });
+});
+
+test("fetch_recent_provider_sessions_request resolves and applies projectId scope", async () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "session-import-project-scope-"));
+  const emitted: Array<{ type: string; payload: Record<string, unknown> }> = [];
+  try {
+    const session = createSessionForWorkspaceTests();
+    const project = createPersistedProjectRecord({
+      projectId: "lpu",
+      rootPath: tempDir,
+      kind: "non_git",
+      displayName: "lpu-monorepo",
+      createdAt: "2026-08-10T00:00:00.000Z",
+      updatedAt: "2026-08-10T00:00:00.000Z",
+    });
+    const requestedCwds: Array<string | undefined> = [];
+    session.emit = (message) =>
+      emitted.push(message as { type: string; payload: Record<string, unknown> });
+    session.projectRegistry.get = async (projectId: string) =>
+      projectId === project.projectId ? project : null;
+    session.agentManager.listAgents = () => [];
+    session.agentStorage.list = async () => [];
+    session.agentManager.listImportableSessions = async (options?: unknown) => {
+      const cwd = (options as { cwd?: string } | undefined)?.cwd;
+      requestedCwds.push(cwd);
+      return [
+        makeImportableProviderSession({
+          provider: "codex",
+          sessionId: "project-session",
+          cwd: tempDir,
+          title: "Project session",
+          lastActivityAt: "2026-08-10T12:00:00.000Z",
+        }),
+      ];
+    };
+
+    await session.handleMessage({
+      type: "fetch_recent_provider_sessions_request",
+      requestId: "req-project-scope",
+      projectId: project.projectId,
+      providers: ["codex"],
+    });
+
+    expect(requestedCwds).toEqual([tempDir]);
+    expect(emitted).toEqual([
+      expect.objectContaining({
+        type: "fetch_recent_provider_sessions_response",
+        payload: expect.objectContaining({
+          requestId: "req-project-scope",
+          entries: [expect.objectContaining({ providerHandleId: "project-session", cwd: tempDir })],
+        }),
+      }),
+    ]);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("fetch_recent_provider_sessions_request forwards providerFilter to agent manager", async () => {

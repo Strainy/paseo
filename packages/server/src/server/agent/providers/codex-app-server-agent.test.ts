@@ -1297,6 +1297,22 @@ describe("Codex app-server provider", () => {
     appServer.assertNoErrors();
   });
 
+  test("explains that an active Codex writer must be closed before import", async () => {
+    const appServer = createFakeCodexAppServer({
+      "thread/resume": () =>
+        Promise.reject(new Error("thread archived-thread-id already has an active writer")),
+    });
+    const killSpy = vi.spyOn(appServer.child, "kill");
+    const provider = createProviderWithFakeAppServer(appServer);
+
+    await expect(provider.resumeSession(archivedThreadHandle())).rejects.toThrow(
+      "This Codex session is still open in another Codex client. Close it there, then try again.",
+    );
+
+    expect(killSpy).toHaveBeenCalledWith("SIGTERM");
+    appServer.assertNoErrors();
+  });
+
   test("closes Codex app-server when archived history hydration fails", async () => {
     const appServer = createFakeCodexAppServer({
       "thread/resume": () =>
@@ -5495,7 +5511,7 @@ describe("Codex importable sessions", () => {
     const fakeClient = {
       request: async (method: string, params?: unknown) => {
         calls.push({ method, params });
-        if (method === "thread/list") return { data: allThreads };
+        if (method === "thread/list") return { data: allThreads, nextCursor: null };
         return {};
       },
       notify: () => {},
@@ -5545,7 +5561,199 @@ describe("Codex importable sessions", () => {
           capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
         },
       },
-      { method: "thread/list", params: { limit: 50, cwd: "/workspace/project-a" } },
+      {
+        method: "thread/list",
+        params: { limit: 50, sortKey: "updated_at", sortDirection: "desc" },
+      },
     ]);
+  });
+
+  test("keeps legacy cwd snapshots to one native page", async () => {
+    const threadList = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], nextCursor: "native-page-2" })
+      .mockRejectedValueOnce(new Error("snapshot listing crossed a native page"));
+    const fakeClient = {
+      request: async (method: string, params?: unknown) =>
+        method === "thread/list" ? await threadList(params) : {},
+      notify: () => {},
+      dispose: async () => {},
+    };
+    const provider = new CodexAppServerAgentClient(createTestLogger(), undefined, {
+      _createCodexClient: () => fakeClient,
+    });
+    castInternals<{ spawnAppServer: () => Promise<ChildProcessWithoutNullStreams> }>(
+      provider,
+    ).spawnAppServer = async () => {
+      const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+      child.exitCode = 0;
+      child.signalCode = null;
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.kill = vi.fn(() => true) as ChildProcessWithoutNullStreams["kill"];
+      return child;
+    };
+
+    await expect(
+      provider.listImportableSessions({ cwd: "/workspace/project-a", limit: 20 }),
+    ).resolves.toEqual([]);
+    expect(threadList).toHaveBeenCalledOnce();
+    expect(threadList).toHaveBeenCalledWith({
+      limit: 50,
+      sortKey: "updated_at",
+      sortDirection: "desc",
+    });
+  });
+
+  test("pages Codex threads by updated activity across the native page limit", async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: `thread-${index}`,
+      cwd: `/workspace/project-${index % 3}`,
+      preview: `Session ${index}`,
+      name: null,
+      createdAt: 1_000 + index,
+      updatedAt: 10_000 - index,
+    }));
+    const lastThread = {
+      id: "thread-100",
+      cwd: "/workspace/project-1",
+      preview: "Last session",
+      name: "Last",
+      createdAt: 2_000,
+      updatedAt: 9_000,
+    };
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const dispose = vi.fn(async () => {});
+    const fakeClient = {
+      request: async (method: string, params?: unknown) => {
+        calls.push({ method, params });
+        if (method !== "thread/list") return {};
+        const cursor = (params as { cursor?: string } | undefined)?.cursor;
+        return cursor === "native-page-2"
+          ? { data: [lastThread], nextCursor: null }
+          : { data: firstPage, nextCursor: "native-page-2" };
+      },
+      notify: () => {},
+      dispose,
+    };
+    const provider = new CodexAppServerAgentClient(createTestLogger(), undefined, {
+      _createCodexClient: () => fakeClient,
+    });
+    castInternals<{ spawnAppServer: () => Promise<ChildProcessWithoutNullStreams> }>(
+      provider,
+    ).spawnAppServer = async () => {
+      const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+      child.exitCode = 0;
+      child.signalCode = null;
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.kill = vi.fn(() => true) as ChildProcessWithoutNullStreams["kill"];
+      return child;
+    };
+
+    const pager = await provider.openImportableSessionPager();
+    const firstPageResult = await pager.next(101);
+    const secondPageResult = await pager.next(1);
+    await pager.close();
+
+    expect(firstPageResult.sessions).toHaveLength(100);
+    expect(firstPageResult.sessions[0]?.providerHandleId).toBe("thread-0");
+    expect(firstPageResult.nextCursor).toBe("native-page-2");
+    expect(secondPageResult.sessions).toHaveLength(1);
+    expect(secondPageResult.sessions[0]?.providerHandleId).toBe("thread-100");
+    expect(secondPageResult.nextCursor).toBeNull();
+    expect(calls.filter((call) => call.method === "thread/list")).toEqual([
+      {
+        method: "thread/list",
+        params: { limit: 101, sortKey: "updated_at", sortDirection: "desc" },
+      },
+      {
+        method: "thread/list",
+        params: {
+          cursor: "native-page-2",
+          limit: 1,
+          sortKey: "updated_at",
+          sortDirection: "desc",
+        },
+      },
+    ]);
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  test("rejects a repeated Codex thread cursor instead of reporting false exhaustion", async () => {
+    const request = vi.fn(async (method: string, params?: unknown) => {
+      if (method !== "thread/list") return {};
+      return {
+        data: [],
+        nextCursor: (params as { cursor?: string } | undefined)?.cursor ?? "repeated-cursor",
+      };
+    });
+    const fakeClient = {
+      request,
+      notify: () => {},
+      dispose: async () => {},
+    };
+    const provider = new CodexAppServerAgentClient(createTestLogger(), undefined, {
+      _createCodexClient: () => fakeClient,
+    });
+    castInternals<{ spawnAppServer: () => Promise<ChildProcessWithoutNullStreams> }>(
+      provider,
+    ).spawnAppServer = async () => {
+      const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+      child.exitCode = 0;
+      child.signalCode = null;
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.kill = vi.fn(() => true) as ChildProcessWithoutNullStreams["kill"];
+      return child;
+    };
+
+    const pager = await provider.openImportableSessionPager();
+    await expect(pager.next(1)).resolves.toEqual({
+      sessions: [],
+      nextCursor: "repeated-cursor",
+    });
+    await expect(pager.next(1)).rejects.toThrow("repeated cursor");
+    await pager.close();
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  test("rejects malformed Codex thread rows before advancing the cursor", async () => {
+    const request = vi.fn(async (method: string) =>
+      method === "thread/list"
+        ? {
+            data: [{ id: "", cwd: "/workspace/project", createdAt: 1, updatedAt: 2 }],
+            nextCursor: "must-not-advance",
+          }
+        : {},
+    );
+    const fakeClient = {
+      request,
+      notify: () => {},
+      dispose: async () => {},
+    };
+    const provider = new CodexAppServerAgentClient(createTestLogger(), undefined, {
+      _createCodexClient: () => fakeClient,
+    });
+    castInternals<{ spawnAppServer: () => Promise<ChildProcessWithoutNullStreams> }>(
+      provider,
+    ).spawnAppServer = async () => {
+      const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+      child.exitCode = 0;
+      child.signalCode = null;
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.kill = vi.fn(() => true) as ChildProcessWithoutNullStreams["kill"];
+      return child;
+    };
+
+    const pager = await provider.openImportableSessionPager();
+    await expect(pager.next(1)).rejects.toThrow("invalid thread row");
+    await pager.close();
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });

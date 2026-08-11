@@ -5,6 +5,7 @@ import path from "node:path";
 import type {
   AgentManager,
   ManagedAgent,
+  ManagedImportableSessionPager,
   ManagedImportableProviderSession,
 } from "./agent-manager.js";
 import { AgentStorage, type StoredAgentRecord } from "./agent-storage.js";
@@ -21,6 +22,8 @@ import {
   listImportableProviderSessions,
   normalizeImportAgentRequest,
 } from "./import-sessions.js";
+import type { ProjectImportScopeResolver } from "../project-import-scope.js";
+import { createRealpathAwarePathMatcher, normalizePathForIdentity } from "../../utils/path.js";
 
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 const importTestDirectories: string[] = [];
@@ -317,6 +320,409 @@ test("listImportableProviderSessions looks past already-imported rows to fill th
   expect(result.filteredAlreadyImportedCount).toBe(1);
 });
 
+test("listImportableProviderSessions drains pageable provider rows through server-owned filters", async () => {
+  const cwd = "/tmp/project";
+  const openImportableSessionPager = vi.fn(
+    async (
+      _provider: string,
+      options?: { cursor?: string },
+    ): Promise<ManagedImportableSessionPager> => {
+      const pages =
+        options?.cursor === "native-page-4"
+          ? [
+              {
+                sessions: [
+                  makeImportableSession({
+                    sessionId: "later",
+                    cwd,
+                    lastActivityAt: "2026-04-30T11:58:00.000Z",
+                  }),
+                ],
+                nextCursor: null,
+              },
+            ]
+          : [
+              {
+                sessions: [
+                  makeImportableSession({
+                    sessionId: "already-imported",
+                    cwd,
+                    lastActivityAt: "2026-04-30T12:02:00.000Z",
+                  }),
+                ],
+                nextCursor: "native-page-2",
+              },
+              {
+                sessions: [
+                  makeImportableSession({
+                    sessionId: "wrong-cwd",
+                    cwd: "/tmp/elsewhere",
+                    lastActivityAt: "2026-04-30T12:01:00.000Z",
+                  }),
+                ],
+                nextCursor: "native-page-3",
+              },
+              {
+                sessions: [
+                  makeImportableSession({
+                    sessionId: "available",
+                    cwd,
+                    lastActivityAt: "2026-04-30T12:00:00.000Z",
+                  }),
+                ],
+                nextCursor: "native-page-4",
+              },
+            ];
+      let pageIndex = 0;
+      return {
+        next: vi.fn(async () => pages[pageIndex++] ?? { sessions: [], nextCursor: null }),
+        close: vi.fn(async () => {}),
+      };
+    },
+  );
+  const listImportableSessions = vi.fn(async () => []);
+  const agentManager = {
+    listAgents: () => [],
+    listImportableSessions,
+    openImportableSessionPager,
+  } satisfies Pick<
+    AgentManager,
+    "listAgents" | "listImportableSessions" | "openImportableSessionPager"
+  >;
+  const agentStorage = {
+    list: async () => [
+      {
+        provider: "codex",
+        persistence: { provider: "codex", sessionId: "already-imported" },
+      } as StoredAgentRecord,
+    ],
+  } satisfies Pick<AgentStorage, "list">;
+
+  const first = await listImportableProviderSessions({
+    request: makeRequest({ cwd, providers: ["codex"], limit: 1 }),
+    agentManager,
+    agentStorage,
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+  });
+
+  expect(first.entries.map((entry) => entry.providerHandleId)).toEqual(["available"]);
+  expect(first.filteredAlreadyImportedCount).toBe(1);
+  expect(first.nextCursor).toEqual(expect.any(String));
+  expect(listImportableSessions).not.toHaveBeenCalled();
+  expect(openImportableSessionPager).toHaveBeenNthCalledWith(1, "codex", { cursor: undefined });
+
+  const second = await listImportableProviderSessions({
+    request: makeRequest({
+      cwd,
+      providers: ["codex"],
+      limit: 1,
+      cursor: first.nextCursor ?? undefined,
+    }),
+    agentManager,
+    agentStorage,
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+  });
+
+  expect(second.entries.map((entry) => entry.providerHandleId)).toEqual(["later"]);
+  expect(second.nextCursor).toBeNull();
+  expect(openImportableSessionPager).toHaveBeenNthCalledWith(2, "codex", {
+    cursor: "native-page-4",
+  });
+});
+
+test("listImportableProviderSessions retains a continuation when its scan budget underfills a page", async () => {
+  let index = 0;
+  const next = vi.fn(async () => {
+    index += 1;
+    return {
+      sessions: [],
+      nextCursor: `native-page-${index + 1}`,
+    };
+  });
+
+  const result = await listImportableProviderSessions({
+    request: makeRequest({ cwd: "/tmp/project", providers: ["codex"], limit: 1 }),
+    agentManager: {
+      listAgents: () => [],
+      listImportableSessions: async () => [],
+      openImportableSessionPager: async () => ({ next, close: async () => {} }),
+    },
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+  });
+
+  expect(result.entries).toEqual([]);
+  expect(result.nextCursor).toEqual(expect.any(String));
+  expect(next).toHaveBeenCalledTimes(100);
+});
+
+test("listImportableProviderSessions does not turn pageable provider failures into exhaustion", async () => {
+  const providerError = new Error("thread/list failed");
+  await expect(
+    listImportableProviderSessions({
+      request: makeRequest({ providers: ["codex"], limit: 1 }),
+      agentManager: {
+        listAgents: () => [],
+        listImportableSessions: vi.fn(async () => []),
+        openImportableSessionPager: async () => {
+          throw providerError;
+        },
+      },
+      agentStorage: { list: async () => [] },
+      providerSnapshotManager: { getProviderLabel: () => "Codex" },
+    }),
+  ).rejects.toBe(providerError);
+});
+
+test("listImportableProviderSessions rejects cursors reused with a different filter", async () => {
+  const openImportableSessionPager = vi.fn(async () => ({
+    next: async () => ({
+      sessions: [
+        makeImportableSession({
+          sessionId: "first-page-session",
+          cwd: "/tmp/project-a",
+          lastActivityAt: "2026-04-30T12:00:00.000Z",
+        }),
+      ],
+      nextCursor: "native-page-2",
+    }),
+    close: async () => {},
+  }));
+  const agentManager = {
+    listAgents: () => [],
+    listImportableSessions: async () => [],
+    openImportableSessionPager,
+  };
+  const first = await listImportableProviderSessions({
+    request: makeRequest({ cwd: "/tmp/project-a", providers: ["codex"], limit: 1 }),
+    agentManager,
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+  });
+
+  await expect(
+    listImportableProviderSessions({
+      request: makeRequest({
+        cwd: "/tmp/project-b",
+        providers: ["codex"],
+        limit: 1,
+        cursor: first.nextCursor ?? undefined,
+      }),
+      agentManager,
+      agentStorage: { list: async () => [] },
+      providerSnapshotManager: { getProviderLabel: () => "Codex" },
+    }),
+  ).rejects.toMatchObject({ name: "ImportSessionsRequestError", code: "invalid_cursor" });
+  expect(openImportableSessionPager).toHaveBeenCalledTimes(1);
+});
+
+test("listImportableProviderSessions drains pageable rows through an exact project scope", async () => {
+  const mainCwd = "/tmp/lpu-monorepo";
+  const worktreeCwd = "/home/user/.codex/worktrees/a227/lpu-monorepo";
+  const resolver = exactProjectScopeResolver([mainCwd, worktreeCwd]);
+  const openImportableSessionPager = vi.fn(async () => {
+    let page = 0;
+    return {
+      next: async () => {
+        page += 1;
+        return page === 1
+          ? {
+              sessions: [
+                makeImportableSession({
+                  sessionId: "unrelated",
+                  cwd: "/tmp/github",
+                  lastActivityAt: "2026-04-30T12:01:00.000Z",
+                }),
+              ],
+              nextCursor: "native-page-2",
+            }
+          : {
+              sessions: [
+                makeImportableSession({
+                  sessionId: "linked",
+                  cwd: worktreeCwd,
+                  lastActivityAt: "2026-04-30T12:00:00.000Z",
+                }),
+              ],
+              nextCursor: "native-page-3",
+            };
+      },
+      close: async () => {},
+    };
+  });
+  const agentManager = {
+    listAgents: () => [],
+    listImportableSessions: async () => [],
+    openImportableSessionPager,
+  };
+
+  const first = await listImportableProviderSessions({
+    request: makeRequest({ projectId: "lpu", providers: ["codex"], limit: 1 }),
+    agentManager,
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+    projectImportScopeResolver: resolver,
+  });
+
+  expect(first.entries.map((entry) => entry.providerHandleId)).toEqual(["linked"]);
+  expect(first.nextCursor).toEqual(expect.any(String));
+
+  await expect(
+    listImportableProviderSessions({
+      request: makeRequest({
+        projectId: "another-project",
+        providers: ["codex"],
+        limit: 1,
+        cursor: first.nextCursor ?? undefined,
+      }),
+      agentManager,
+      agentStorage: { list: async () => [] },
+      providerSnapshotManager: { getProviderLabel: () => "Codex" },
+      projectImportScopeResolver: resolver,
+    }),
+  ).rejects.toMatchObject({ code: "invalid_cursor" });
+  expect(openImportableSessionPager).toHaveBeenCalledTimes(1);
+});
+
+test("listImportableProviderSessions fans non-pageable providers out to every project cwd", async () => {
+  const mainCwd = "/tmp/lpu-monorepo";
+  const worktreeCwd = "/home/user/.codex/worktrees/a227/lpu-monorepo";
+  const listImportableSessions = vi.fn(async (options?: { cwd?: string }) => {
+    if (options?.cwd === mainCwd) {
+      return [
+        makeImportableSession({
+          provider: "claude",
+          sessionId: "main",
+          cwd: mainCwd,
+          lastActivityAt: "2026-04-30T12:00:00.000Z",
+        }),
+        makeImportableSession({
+          provider: "claude",
+          sessionId: "duplicate",
+          cwd: mainCwd,
+          lastActivityAt: "2026-04-30T11:59:00.000Z",
+        }),
+      ];
+    }
+    return [
+      makeImportableSession({
+        provider: "claude",
+        sessionId: "worktree",
+        cwd: worktreeCwd,
+        lastActivityAt: "2026-04-30T12:01:00.000Z",
+      }),
+      makeImportableSession({
+        provider: "claude",
+        sessionId: "duplicate",
+        cwd: "/tmp/unrelated",
+        lastActivityAt: "2026-04-30T12:03:00.000Z",
+      }),
+      makeImportableSession({
+        provider: "claude",
+        sessionId: "provider-ignored-cwd",
+        cwd: "/tmp/unrelated",
+        lastActivityAt: "2026-04-30T12:02:00.000Z",
+      }),
+    ];
+  });
+
+  const result = await listImportableProviderSessions({
+    request: makeRequest({ projectId: "lpu", providers: ["claude"], limit: 10 }),
+    agentManager: { listAgents: () => [], listImportableSessions },
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "Claude" },
+    projectImportScopeResolver: exactProjectScopeResolver([mainCwd, worktreeCwd]),
+  });
+
+  expect(listImportableSessions).toHaveBeenCalledTimes(2);
+  expect(listImportableSessions.mock.calls.map(([options]) => options?.cwd).sort()).toEqual(
+    [mainCwd, worktreeCwd].sort(),
+  );
+  expect(result.entries.map((entry) => entry.providerHandleId)).toEqual([
+    "worktree",
+    "main",
+    "duplicate",
+  ]);
+});
+
+test("listImportableProviderSessions shares its project cwd fanout bound across providers", async () => {
+  const scopedCwds = Array.from({ length: 6 }, (_, index) => `/tmp/lpu-worktree-${index}`);
+  let active = 0;
+  let maxActive = 0;
+  const listImportableSessions = vi.fn(async () => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    active -= 1;
+    return [];
+  });
+  const agentManager = { listAgents: () => [], listImportableSessions };
+  const commonInput = {
+    agentManager,
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "" },
+    projectImportScopeResolver: exactProjectScopeResolver(scopedCwds),
+  };
+
+  await Promise.all([
+    listImportableProviderSessions({
+      ...commonInput,
+      request: makeRequest({ projectId: "lpu", providers: ["claude"], limit: 10 }),
+    }),
+    listImportableProviderSessions({
+      ...commonInput,
+      request: makeRequest({ projectId: "lpu", providers: ["copilot"], limit: 10 }),
+    }),
+  ]);
+
+  expect(listImportableSessions).toHaveBeenCalledTimes(scopedCwds.length * 2);
+  expect(maxActive).toBe(4);
+});
+
+test("listImportableProviderSessions rejects ambiguous cwd and project scope", async () => {
+  await expect(
+    listImportableProviderSessions({
+      request: makeRequest({ cwd: "/tmp/lpu", projectId: "lpu" }),
+      agentManager: { listAgents: () => [], listImportableSessions: async () => [] },
+      agentStorage: { list: async () => [] },
+      providerSnapshotManager: { getProviderLabel: () => "" },
+      projectImportScopeResolver: exactProjectScopeResolver(["/tmp/lpu"]),
+    }),
+  ).rejects.toMatchObject({ code: "invalid_scope" });
+});
+
+test("listImportableProviderSessions accepts legacy v1 cwd cursors", async () => {
+  const cwd = "/tmp/project";
+  const legacyCursor = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      provider: "codex",
+      cwd: normalizePathForIdentity(cwd),
+      since: null,
+      cursor: "native-page-2",
+    }),
+  ).toString("base64url");
+  const openImportableSessionPager = vi.fn(async () => ({
+    next: async () => ({ sessions: [], nextCursor: null }),
+    close: async () => {},
+  }));
+
+  await listImportableProviderSessions({
+    request: makeRequest({ cwd, providers: ["codex"], cursor: legacyCursor }),
+    agentManager: {
+      listAgents: () => [],
+      listImportableSessions: async () => [],
+      openImportableSessionPager,
+    },
+    agentStorage: { list: async () => [] },
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
+  });
+
+  expect(openImportableSessionPager).toHaveBeenCalledWith("codex", {
+    cursor: "native-page-2",
+  });
+});
+
 test("listImportableProviderSessions includes a provider session after its Paseo agent is archived", async () => {
   const cwd = "/tmp/project";
   const archivedSession = makeImportableSession({
@@ -437,7 +843,7 @@ test("listImportableProviderSessions filters out metadata generation sessions", 
   expect(result.filteredAlreadyImportedCount).toBe(0);
 });
 
-test("listImportableProviderSessions keeps realpath-equivalent cwd matches", async () => {
+test("listImportableProviderSessions keeps realpath-equivalent cwd matches while paging", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "paseo-import-cwd-"));
   const realCwd = path.join(root, "real-project");
   const linkedCwd = path.join(root, "linked-project");
@@ -446,28 +852,35 @@ test("listImportableProviderSessions keeps realpath-equivalent cwd matches", asy
   const persistedCwd = realpathSync(linkedCwd);
 
   const result = await listImportableProviderSessions({
-    request: makeRequest({ cwd: linkedCwd, providers: ["pi"] }),
+    request: makeRequest({ cwd: linkedCwd, providers: ["codex"] }),
     agentManager: {
       listAgents: () => [],
-      listImportableSessions: async () => [
-        makeImportableSession({
-          provider: "pi",
-          sessionId: "pi-session",
-          nativeHandle: "pi-handle",
-          cwd: persistedCwd,
-          title: "Pi session",
-          lastActivityAt: "2026-04-30T12:00:00.000Z",
-          firstPrompt: "remember this",
+      listImportableSessions: async () => [],
+      openImportableSessionPager: async () => ({
+        next: async () => ({
+          sessions: [
+            makeImportableSession({
+              sessionId: "codex-session",
+              nativeHandle: "codex-handle",
+              cwd: persistedCwd,
+              title: "Codex session",
+              lastActivityAt: "2026-04-30T12:00:00.000Z",
+              firstPrompt: "remember this",
+            }),
+          ],
+          nextCursor: null,
         }),
-      ],
-    } satisfies Pick<AgentManager, "listAgents" | "listImportableSessions">,
+        close: async () => {},
+      }),
+    },
     agentStorage: {
       list: async () => [],
     } satisfies Pick<AgentStorage, "list">,
-    providerSnapshotManager: { getProviderLabel: () => "Pi" },
+    providerSnapshotManager: { getProviderLabel: () => "Codex" },
   });
 
-  expect(result.entries.map((entry) => entry.providerHandleId)).toEqual(["pi-handle"]);
+  expect(result.entries.map((entry) => entry.providerHandleId)).toEqual(["codex-handle"]);
+  expect(result.nextCursor).toBeNull();
 });
 
 test("listImportableProviderSessions rejects invalid since values", async () => {
@@ -514,7 +927,44 @@ test("normalizeImportAgentRequest accepts new and legacy import handle shapes", 
     provider: "codex",
     providerHandleId: "thread-2",
   });
+
+  expect(
+    normalizeImportAgentRequest({
+      type: "import_agent_request",
+      requestId: "project-shape",
+      providerId: "codex",
+      providerHandleId: "thread-3",
+      projectId: "lpu",
+    }),
+  ).toEqual({
+    requestId: "project-shape",
+    provider: "codex",
+    providerHandleId: "thread-3",
+    projectId: "lpu",
+  });
+
+  expect(
+    normalizeImportAgentRequest({
+      type: "import_agent_request",
+      requestId: "ambiguous-target",
+      providerId: "codex",
+      providerHandleId: "thread-4",
+      workspaceId: "workspace",
+      projectId: "lpu",
+    }),
+  ).toEqual({ error: "Import cannot target both a workspace and a project" });
 });
+
+function exactProjectScopeResolver(exactCwds: string[]): ProjectImportScopeResolver {
+  const matchers = exactCwds.map((cwd) => createRealpathAwarePathMatcher(cwd));
+  return {
+    resolve: vi.fn(async (projectId: string) => ({
+      projectId,
+      exactCwds,
+      matchesCwd: async (candidate: string) => matchers.some((matches) => matches(candidate)),
+    })),
+  };
+}
 
 function makeStoredProviderSession(input: {
   id: string;
@@ -716,6 +1166,35 @@ test("importProviderSession uses the provider import path with the requested lab
     timelineSize: 2,
     createdWorkspace: null,
   });
+});
+
+test("importProviderSession forwards the requested project to workspace provisioning", async () => {
+  const harness = await ProviderImportHarness.create();
+  const baseProvisioning = createImportWorkspace("ws-project-import");
+  const runInImportWorkspace = vi.fn(baseProvisioning.runInImportWorkspace);
+
+  await importProviderSession({
+    request: {
+      requestId: "import-project-thread",
+      provider: "codex",
+      providerHandleId: "thread-imported",
+      cwd: "/tmp/imported-agent",
+      projectId: "lpu",
+    },
+    workspaceProvisioning: { runInImportWorkspace },
+    agentManager: harness.manager,
+    agentStorage: harness.storage,
+    logger: createTestLogger(),
+  });
+
+  expect(runInImportWorkspace).toHaveBeenCalledWith(
+    {
+      cwd: "/tmp/imported-agent",
+      requestedWorkspaceId: undefined,
+      requestedProjectId: "lpu",
+    },
+    expect.any(Function),
+  );
 });
 
 test("importProviderSession rejects a provider session with an active stored owner", async () => {

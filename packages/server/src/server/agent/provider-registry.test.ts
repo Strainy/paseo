@@ -60,6 +60,7 @@ const mockState = vi.hoisted(() => {
     isCommandAvailable: vi.fn(async (_command: string) => false),
     runtimeModels: new Map<string, AgentModelDefinition[]>(),
     cursorListFeaturesConfigs: [] as AgentSessionConfig[],
+    codexPagerOpenOptions: [] as Array<{ cursor?: string } | undefined>,
     reset() {
       this.constructorArgs.claude = [];
       this.constructorArgs.codex = [];
@@ -73,6 +74,7 @@ const mockState = vi.hoisted(() => {
       this.isCommandAvailable.mockImplementation(async (_command: string) => false);
       this.runtimeModels.clear();
       this.cursorListFeaturesConfigs = [];
+      this.codexPagerOpenOptions = [];
     },
   };
 });
@@ -147,6 +149,7 @@ vi.mock("./providers/codex-app-server-agent.js", () => ({
       supportsMcpServers: true,
       supportsReasoningStream: true,
       supportsToolInvocations: true,
+      supportsSessionListing: true,
     };
     readonly provider = "codex";
     readonly runtimeSettings?: unknown;
@@ -168,6 +171,14 @@ vi.mock("./providers/codex-app-server-agent.js", () => ({
       return {
         models: mockState.runtimeModels.get(this.provider) ?? [],
         modes: [],
+      };
+    }
+
+    async openImportableSessionPager(options?: { cursor?: string }) {
+      mockState.codexPagerOpenOptions.push(options);
+      return {
+        next: async () => ({ sessions: [], nextCursor: options?.cursor ?? null }),
+        close: async () => {},
       };
     }
 
@@ -1069,6 +1080,27 @@ test("derived provider inherits and merges disallowedTools from base", () => {
       ? Reflect.get(zaiArgs!.runtimeSettings, "disallowedTools")
       : [];
   expect(zaiDisallowedTools).toEqual(["WebSearch", "ComputerUse"]);
+});
+
+test("derived provider forwards the base provider import-session pager", async () => {
+  const clients = createAllClients(logger, {
+    providerOverrides: {
+      "custom-codex": {
+        extends: "codex",
+        label: "Custom Codex",
+      },
+    },
+  });
+
+  const pager = await clients["custom-codex"]?.openImportableSessionPager?.({
+    cursor: "native-page-2",
+  });
+
+  await expect(pager?.next(1)).resolves.toEqual({
+    sessions: [],
+    nextCursor: "native-page-2",
+  });
+  expect(mockState.codexPagerOpenOptions).toContainEqual({ cursor: "native-page-2" });
 });
 
 test("extension inherits base override — override claude command, zai extends claude gets overridden command", () => {

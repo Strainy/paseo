@@ -67,7 +67,7 @@ import { SourceControlPanelIcon } from "@/components/icons/source-control-panel-
 import { WorkspaceActions } from "@/git/workspace-actions";
 import { WorkspaceOpenInEditorButton } from "@/screens/workspace/workspace-open-in-editor-button";
 import { WorkspaceScriptsButton } from "@/screens/workspace/workspace-scripts-button";
-import { ImportSessionSheet } from "@/components/import-session-sheet";
+import { ImportSessionSheet, type ImportSessionTarget } from "@/components/import-session-sheet";
 import { useToast } from "@/contexts/toast-context";
 import { getOrCreateClientId } from "@/utils/client-id";
 import { selectIsFileExplorerOpen, usePanelStore } from "@/stores/panel-store";
@@ -1866,6 +1866,29 @@ function useWorkspaceLabelsEditor({
   };
 }
 
+function createWorkspaceImportSessionTarget(
+  cwd: string | null,
+  workspaceId: string,
+): ImportSessionTarget | null {
+  if (!cwd?.trim() || !workspaceId.trim()) return null;
+  return { kind: "workspace", cwd, workspaceId };
+}
+
+type WorkspaceImportSessionSheetProps = Omit<
+  ComponentProps<typeof ImportSessionSheet>,
+  "target"
+> & {
+  target: ImportSessionTarget | null;
+};
+
+function WorkspaceImportSessionSheet({
+  target,
+  ...props
+}: WorkspaceImportSessionSheetProps): ReactElement | null {
+  if (!target) return null;
+  return <ImportSessionSheet {...props} target={target} />;
+}
+
 function WorkspaceScreenContent({
   serverId,
   workspaceId,
@@ -1913,6 +1936,10 @@ function WorkspaceScreenContent({
     (state) => state.sessions[normalizedServerId]?.serverInfo?.features?.providersSnapshot === true,
   );
   const workspaceDirectory = workspaceDescriptor?.workspaceDirectory || null;
+  const importSessionTarget = useMemo<ImportSessionTarget | null>(
+    () => createWorkspaceImportSessionTarget(workspaceDirectory, normalizedWorkspaceId),
+    [normalizedWorkspaceId, workspaceDirectory],
+  );
   const isMissingWorkspaceDirectory = Boolean(workspaceDescriptor) && !workspaceDirectory;
   const [isImportSheetVisible, setIsImportSheetVisible] = useState(false);
   const canOpenImportSheet = [client, isConnected, workspaceDirectory].every(Boolean);
@@ -4068,12 +4095,11 @@ function WorkspaceScreenContent({
             >
               {workspaceCenterColumn}
             </WorkspaceChromeRow>
-            <ImportSessionSheet
+            <WorkspaceImportSessionSheet
               visible={isRouteFocused && isImportSheetVisible}
               client={client}
               serverId={normalizedServerId}
-              cwd={workspaceDirectory}
-              workspaceId={normalizedWorkspaceId}
+              target={importSessionTarget}
               onClose={closeImportSheet}
               onImportedAgent={handleImportedAgent}
             />
