@@ -88,6 +88,7 @@ import { useGlobalNewWorkspaceAction } from "@/hooks/use-global-new-workspace-ac
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
 import { useFaviconStatus } from "@/hooks/use-favicon-status";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useMouseNavigationButtons } from "@/hooks/use-mouse-navigation-buttons";
 import { resolveExplorerSidebarPresentation } from "@/workspace-tabs/explorer-sidebar";
 import { KeyboardShiftProvider } from "@/hooks/use-keyboard-shift-style";
 import { useCompactWebViewportZoomLock } from "@/hooks/use-compact-web-viewport-zoom-lock";
@@ -513,6 +514,8 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     exitFocusMode,
     cycleTheme,
   });
+
+  useMouseNavigationButtons();
 
   useActiveWorktreeNewAction();
   useGlobalNewWorkspaceAction();
