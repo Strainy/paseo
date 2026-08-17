@@ -9,16 +9,23 @@ _.path = [
   "{{ env.HOME }}/.local/share/mise/installs/android-sdk/{{ vars.android_sdk_version }}/emulator",
 ]
 
+[tasks.deps]
+description = "Install npm workspace dependencies"
+run = "npm install"
+
 [tasks."install:macos"]
 description = "Build, smoke-test, install, and open Paseo.app from this checkout"
+depends = ["deps"]
 run = "./scripts/install-macos-from-source.sh"
 
 [tasks."install:local-daemon"]
 description = "Build and install the standalone Paseo daemon from this checkout on this machine"
+depends = ["deps"]
 run = "./scripts/install-local-daemon-from-source.sh"
 
 [tasks."install:remote-daemon"]
 description = "Build and install the Paseo daemon from this checkout on a remote SSH server"
+depends = ["deps"]
 usage = '''
 arg "<ssh-target>" help="Remote SSH config host or user@host"
 '''
