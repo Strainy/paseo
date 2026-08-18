@@ -5,6 +5,7 @@ import type {
 import type { DesktopDaemonTransportTarget } from "./desktop-daemon";
 import {
   defaultLocalDaemonTransportRpc,
+  type LocalDaemonTransportEvent,
   type LocalDaemonTransportRpc,
 } from "./local-daemon-transport-rpc";
 
@@ -83,7 +84,7 @@ export function createDesktopDaemonTransportFactory(
 ): DaemonTransportFactory | null {
   return ({ url }) => {
     const target = parseDesktopDaemonTransportUrl(url);
-    let sessionId: string | null = null;
+    const sessionId = `local-session-${globalThis.crypto.randomUUID()}`;
     let unlisten: (() => void) | null = null;
     let disposed = false;
     let didEmitOpen = false;
@@ -108,6 +109,9 @@ export function createDesktopDaemonTransportFactory(
       }
     };
     const emitError = (event?: unknown) => {
+      if (disposed) {
+        return;
+      }
       for (const handler of errorHandlers) {
         handler(event);
       }
@@ -118,61 +122,49 @@ export function createDesktopDaemonTransportFactory(
       }
     };
 
-    void rpc
-      .listenToEvents((payload) => {
-        if (disposed || !sessionId || payload.sessionId !== sessionId) {
+    const handleEvent = (payload: LocalDaemonTransportEvent) => {
+      if (disposed || payload.sessionId !== sessionId) {
+        return;
+      }
+      if (payload.kind === "open") {
+        emitOpen();
+        return;
+      }
+      if (payload.kind === "message") {
+        if (payload.text) {
+          emitMessage(payload.text, false);
           return;
         }
-        if (payload.kind === "open") {
-          emitOpen();
-          return;
+        if (payload.binaryBase64) {
+          emitMessage(decodeBase64ToBytes(payload.binaryBase64), true);
         }
-        if (payload.kind === "message") {
-          if (payload.text) {
-            emitMessage(payload.text, false);
-            return;
-          }
-          if (payload.binaryBase64) {
-            emitMessage(decodeBase64ToBytes(payload.binaryBase64), true);
-          }
-          return;
-        }
-        if (payload.kind === "close") {
-          emitClose(payload);
-          return;
-        }
-        emitError(payload.error ?? "Local daemon transport error");
-      })
-      .then((cleanup) => {
+        return;
+      }
+      if (payload.kind === "close") {
+        emitClose(payload);
+        return;
+      }
+      emitError(payload.error ?? "Local daemon transport error");
+    };
+
+    void (async () => {
+      try {
+        const cleanup = await rpc.listenToEvents(handleEvent);
         if (disposed) {
           cleanup();
           return;
         }
         unlisten = cleanup;
-        return;
-      })
-      .catch((error) => {
-        emitError(error);
-      });
 
-    void rpc
-      .openSession(target)
-      .then((id) => {
-        if (disposed) {
-          void rpc.closeSession(id).catch((error) => emitError(error));
-          return;
-        }
-        sessionId = id;
-        emitOpen();
-        return;
-      })
-      .catch((error) => {
+        await rpc.openSession({ sessionId, target });
+      } catch (error) {
         emitError(error);
-      });
+      }
+    })();
 
     const transport: DaemonTransport = {
       send: (data) => {
-        if (!sessionId) {
+        if (!didEmitOpen) {
           return;
         }
         if (typeof data === "string") {
@@ -185,12 +177,11 @@ export function createDesktopDaemonTransportFactory(
         void rpc.sendMessage({ sessionId, binaryBase64 }).catch((error) => emitError(error));
       },
       close: () => {
-        disposed = true;
-        const currentSessionId = sessionId;
-        sessionId = null;
-        if (currentSessionId) {
-          void rpc.closeSession(currentSessionId).catch((error) => emitError(error));
+        if (disposed) {
+          return;
         }
+        disposed = true;
+        void rpc.closeSession(sessionId).catch((error) => emitError(error));
         unlisten?.();
         unlisten = null;
       },
