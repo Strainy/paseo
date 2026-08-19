@@ -95,9 +95,24 @@ interface CreateRequestContext {
   cwd: string;
 }
 
+function createAttemptFromInput(
+  text: string,
+  images: UserMessageImageAttachment[],
+  attachments: AgentAttachment[],
+): CreateAttempt {
+  return {
+    clientMessageId: generateMessageId(),
+    text,
+    timestamp: new Date(),
+    ...(images.length > 0 ? { images } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
+  };
+}
+
 interface UseDraftAgentCreateFlowOptions<TDraftAgent, TCreateResult> {
   draftId: string;
   getPendingServerId: () => string | null;
+  getPendingWorkspaceId?: () => string | null;
   initialAttempt?: CreateAttempt | null;
   allowEmptyText?: boolean;
   validateBeforeSubmit?: (ctx: SubmitContext) => string | null;
@@ -112,6 +127,7 @@ interface UseDraftAgentCreateFlowOptions<TDraftAgent, TCreateResult> {
 export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
   draftId,
   getPendingServerId,
+  getPendingWorkspaceId,
   initialAttempt = null,
   allowEmptyText = false,
   validateBeforeSubmit,
@@ -196,6 +212,25 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
         throw error;
       }
 
+      // Claim a per-workspace create slot synchronously so that concurrent
+      // submissions (double submit, or multiple draft tabs consuming the same
+      // pending submission) cannot both create an agent.
+      const workspaceId =
+        getPendingWorkspaceId?.() ??
+        useCreateFlowStore.getState().pendingByDraftId[draftId]?.workspaceId ??
+        null;
+      const canBeginCreate = useCreateFlowStore.getState().tryBeginCreate({
+        serverId: pendingServerId,
+        workspaceId,
+        clientMessageId: attempt.clientMessageId,
+      });
+      if (!canBeginCreate) {
+        const error = new Error(t("composer.errors.alreadyLoading"));
+        dispatch({ type: "DRAFT_SET_ERROR", message: error.message });
+        throw error;
+      }
+
+
       try {
         await onBeforeSubmit?.({
           attempt,
@@ -204,6 +239,8 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
           attachments: attempt.attachments,
           cwd,
         });
+
+
         const createResult = await createRequest({
           attempt,
           text: attempt.text,
@@ -237,6 +274,8 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
         clearPendingCreateAttempt({ draftId });
         onCreateError?.(resolved);
         throw error;
+      } finally {
+        useCreateFlowStore.getState().endCreate({ serverId: pendingServerId, workspaceId });
       }
     },
     [
@@ -244,6 +283,7 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
       createRequest,
       draftId,
       getPendingServerId,
+      getPendingWorkspaceId,
       markPendingCreateLifecycle,
       onBeforeSubmit,
       onCreateError,
@@ -295,18 +335,13 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
         throw error;
       }
 
-      const attempt: CreateAttempt = {
-        clientMessageId: generateMessageId(),
-        text: trimmedPrompt,
-        timestamp: new Date(),
-        ...(images && images.length > 0 ? { images } : {}),
-        ...(wirePayload.attachments.length > 0 ? { attachments: wirePayload.attachments } : {}),
-      };
+      const attempt = createAttemptFromInput(trimmedPrompt, images, wirePayload.attachments);
 
       startCreateAttempt(attempt);
       setPendingCreateAttempt({
         draftId,
         serverId: pendingServerId,
+        workspaceId: getPendingWorkspaceId?.() ?? undefined,
         agentId: null,
         clientMessageId: attempt.clientMessageId,
         text: attempt.text,
@@ -324,6 +359,7 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
       allowEmptyText,
       draftId,
       getPendingServerId,
+      getPendingWorkspaceId,
       isSubmitting,
       onCreateStart,
       runCreateAttempt,
