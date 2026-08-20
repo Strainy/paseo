@@ -282,6 +282,37 @@ describe("ReplicaCache", () => {
     });
   });
 
+  it("restores a manual unread marker while running activity masks its status", async () => {
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+    const storage = new MemoryStorage();
+    const writer = new ReplicaCache(storage);
+    writer.setHosts([SERVER_ID]);
+    seedSession();
+
+    useSessionStore.getState().setWorkspaces(SERVER_ID, (workspaces) => {
+      const cachedWorkspace = workspaces.get("workspace-1");
+      if (!cachedWorkspace) throw new Error("Expected seeded workspace");
+      return new Map(workspaces).set("workspace-1", {
+        ...cachedWorkspace,
+        status: "running",
+        markedUnreadAt,
+      });
+    });
+    await writer.flush();
+
+    useSessionStore.getState().clearSession(SERVER_ID);
+    const reader = new ReplicaCache(storage);
+    reader.setHosts([SERVER_ID]);
+    await reader.restore();
+
+    expect(
+      useSessionStore.getState().sessions[SERVER_ID]?.workspaces.get("workspace-1"),
+    ).toMatchObject({
+      status: "running",
+      markedUnreadAt,
+    });
+  });
+
   it("restores canonical turn membership without downgrading tagged rows", async () => {
     const storage = new MemoryStorage();
     const writer = new ReplicaCache(storage);

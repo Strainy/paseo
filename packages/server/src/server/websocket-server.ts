@@ -1728,6 +1728,8 @@ export class VoiceAssistantWebSocketServer {
         workspacePinning: true,
         // COMPAT(workspaceBaseBranch): added in v0.3.0, remove after 2027-02-07.
         workspaceBaseBranch: true,
+        // COMPAT(workspaceMarkUnread): added in v0.5.0, remove after 2027-02-19.
+        workspaceMarkUnread: true,
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: true,
         // COMPAT(projectGithubClone): added in v0.1.108, remove gate after 2027-01-15.

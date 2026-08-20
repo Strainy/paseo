@@ -121,6 +121,7 @@ export interface WorkspaceDescriptor {
   baseBranchOverride?: string | null;
   pinnedAt?: string | null;
   labels?: string[];
+  markedUnreadAt?: string | null;
   status: WorkspaceDescriptorPayload["status"];
   statusEnteredAt: Date | null;
   archivingAt: string | null;
@@ -161,6 +162,8 @@ export function normalizeWorkspaceDescriptor(
     pinnedAt: payload.pinnedAt ?? null,
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
+    // COMPAT(workspaceMarkUnread): added in v0.5.0, remove optional after 2027-02-19.
+    markedUnreadAt: payload.markedUnreadAt ?? null,
     status: payload.status,
     statusEnteredAt,
     archivingAt: payload.archivingAt ?? null,
