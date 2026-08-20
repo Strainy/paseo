@@ -1545,6 +1545,10 @@ export const ptBR: TranslationResources = {
         title: "Conexão direta",
         description: "Rede local ou VPN.",
       },
+      remoteSsh: {
+        title: "SSH remoto",
+        description: "Conecte-se pelo cliente SSH do desktop.",
+      },
       scanQr: {
         title: "Escanear QR code",
         description: "Conexão relay criptografada.",
@@ -1595,6 +1599,27 @@ export const ptBR: TranslationResources = {
         unableToConnect:
           "Não foi possível conectar. Verifique o host/porta e se o daemon está acessível.",
         details: "Detalhes: {{detail}}",
+      },
+    },
+    remoteSsh: {
+      title: "SSH remoto",
+      helper: "Conecte-se a um daemon Paseo no host remoto.",
+      fields: {
+        host: "Host",
+        port: "Porta SSH",
+        identityFile: "Caminho do arquivo de identidade",
+        optional: "Opcional",
+      },
+      actions: {
+        cancel: "Cancelar",
+        connect: "Conectar",
+        connecting: "Conectando...",
+      },
+      errors: {
+        hostRequired: "O host é obrigatório",
+        invalidHost: "Insira um host SSH válido",
+        invalidPort: "A porta SSH deve estar entre 1 e 65535",
+        failedToConnect: "Não foi possível conectar por SSH. {{detail}}",
       },
     },
     link: {
@@ -2223,6 +2248,7 @@ export const ptBR: TranslationResources = {
       badges: {
         relay: "Relay",
         local: "Local",
+        remoteSsh: "SSH remoto",
       },
       connections: {
         title: "Conexões",
