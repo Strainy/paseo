@@ -3540,7 +3540,7 @@ export const ServerInfoStatusPayloadSchema = z
         providerSubagentNesting: z.boolean().optional(),
         // COMPAT(workspacePinning): added in v0.1.107, remove gate after 2027-01-12.
         workspacePinning: z.boolean().optional(),
-        // COMPAT(workspaceMarkUnread): added in v0.5.0, remove after 2027-08-20.
+        // COMPAT(workspaceMarkUnread): added in v0.5.0, remove after 2027-02-19.
         workspaceMarkUnread: z.boolean().optional(),
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
         hubRelationship: z.boolean().optional(),
@@ -3898,6 +3898,10 @@ export const WorkspaceDescriptorPayloadSchema = z
     pinnedAt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
+    // COMPAT(workspaceMarkUnread): added in v0.5.0, remove after 2027-02-19.
+    // Keep this distinct from aggregate status because higher-priority activity
+    // can temporarily mask manual unread attention.
+    markedUnreadAt: z.string().nullable().optional(),
     archivingAt: z.string().nullable().optional().default(null),
     status: WorkspaceStateBucketSchema,
     // Best-effort workspace status entry timestamp. Old daemons omit the
@@ -4679,10 +4683,14 @@ export const WorkspaceClearAttentionResponseSchema = z.object({
     requestId: z.string(),
     workspaceId: z.union([z.string(), z.array(z.string())]),
     clearedAgentIds: z.array(z.string()),
+    // COMPAT(workspaceMarkUnread): added in v0.5.0, remove optional after 2027-02-19.
+    clearedTerminalIds: z.array(z.string()).optional(),
     results: z.array(
       z.object({
         workspaceId: z.string(),
         clearedAgentIds: z.array(z.string()),
+        // COMPAT(workspaceMarkUnread): added in v0.5.0, remove optional after 2027-02-19.
+        clearedTerminalIds: z.array(z.string()).optional(),
         success: z.boolean(),
         error: z.string().nullable(),
       }),
@@ -4697,7 +4705,7 @@ export const WorkspaceMarkUnreadResponseSchema = z.object({
   payload: z.object({
     requestId: z.string(),
     workspaceId: z.string(),
-    markedAgentId: z.string().nullable(),
+    markedUnreadAt: z.string().nullable(),
     success: z.boolean(),
     error: z.string().nullable(),
   }),
@@ -7054,6 +7062,7 @@ export type ProjectGithubCloneProtocol = z.infer<typeof ProjectGithubCloneProtoc
 export type ArchiveWorkspaceRequest = z.infer<typeof ArchiveWorkspaceRequestSchema>;
 export type WorkspaceClearAttentionRequest = z.infer<typeof WorkspaceClearAttentionRequestSchema>;
 export type WorkspaceMarkUnreadRequest = z.infer<typeof WorkspaceMarkUnreadRequestSchema>;
+export type WorkspaceMarkUnreadResponse = z.infer<typeof WorkspaceMarkUnreadResponseSchema>;
 export type FileExplorerRequest = z.infer<typeof FileExplorerRequestSchema>;
 export type FileExplorerResponse = z.infer<typeof FileExplorerResponseSchema>;
 export type FileVersion = z.infer<typeof FileVersionSchema>;

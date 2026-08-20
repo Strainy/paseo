@@ -14,7 +14,7 @@ import { toWorktreeArchiveRisk } from "@/git/worktree-archive-warning";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
-import { useWorkspaceReadState } from "@/hooks/use-workspace-read-state";
+import { useWorkspaceReadController } from "@/hooks/use-workspace-read-controller";
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { isNative as platformIsNative } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -48,6 +48,7 @@ interface SidebarWorkspaceRowProps {
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   canCopyBranchName: boolean;
+  supportsMarkUnread: boolean;
   onPress: () => void;
   /** The host pill after the title. Absent → the sidebar spans one host, or this one is hidden. */
   hostBadge?: HostBadgeModel | null;
@@ -65,6 +66,7 @@ export function SidebarWorkspaceRow({
   shortcutNumber,
   showShortcutBadge,
   canCopyBranchName,
+  supportsMarkUnread,
   onPress,
   hostBadge,
   isCreating = false,
@@ -123,21 +125,22 @@ export function SidebarWorkspaceRow({
   }, []);
 
   const archiveShortcutKeys = useShortcutKeys("archive-workspace");
-  const { hasClearableAttention, canMarkUnread, clearAttention, markUnread } =
-    useWorkspaceReadState({
-      serverId: workspace.serverId,
-      workspaceId: workspace.workspaceId,
+  const readController = useWorkspaceReadController({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    status: workspace.statusBucket,
+    markedUnreadAt: workspace.markedUnreadAt,
+    supportsMarkUnread,
+  });
+  const handleReadAction = useCallback(() => {
+    void readController.performAction().catch((error) => {
+      const fallbackKey =
+        readController.action === "mark_unread"
+          ? "sidebar.workspace.toasts.markUnreadFailed"
+          : "sidebar.workspace.toasts.markAsReadFailed";
+      toast.error(error instanceof Error ? error.message : t(fallbackKey));
     });
-  const handleMarkAsRead = useCallback(() => {
-    void clearAttention().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to mark workspace as read");
-    });
-  }, [clearAttention, toast]);
-  const handleMarkAsUnread = useCallback(() => {
-    void markUnread().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to mark workspace as unread");
-    });
-  }, [markUnread, toast]);
+  }, [readController, t, toast]);
 
   useKeyboardActionHandler({
     handlerId: `workspace-archive-${workspace.workspaceKey}`,
@@ -171,8 +174,9 @@ export function SidebarWorkspaceRow({
         onCopyBranchName={canCopyBranchName ? handleCopyBranchName : undefined}
         onCopyPath={handleCopyPath}
         onRename={handleOpenRename}
-        onMarkAsRead={hasClearableAttention ? handleMarkAsRead : undefined}
-        onMarkAsUnread={canMarkUnread ? handleMarkAsUnread : undefined}
+        onMarkAsRead={readController.action === "mark_as_read" ? handleReadAction : undefined}
+        onMarkUnread={readController.action === "mark_unread" ? handleReadAction : undefined}
+        readActionPending={readController.pending}
         archiveShortcutKeys={selected ? archiveShortcutKeys : null}
       />
       <WorkspaceRenameModal
@@ -205,7 +209,8 @@ interface WorkspaceRowBodyProps {
   onCopyPath?: () => void;
   onRename?: () => void;
   onMarkAsRead?: () => void;
-  onMarkAsUnread?: () => void;
+  onMarkUnread?: () => void;
+  readActionPending?: boolean;
   archiveShortcutKeys?: ShortcutKey[][] | null;
 }
 
@@ -229,7 +234,8 @@ function WorkspaceRowBody({
   onCopyPath,
   onRename,
   onMarkAsRead,
-  onMarkAsUnread,
+  onMarkUnread,
+  readActionPending,
   archiveShortcutKeys,
 }: WorkspaceRowBodyProps) {
   const isCompact = useIsCompactFormFactor();
@@ -302,7 +308,8 @@ function WorkspaceRowBody({
               onCopyBranchName={onCopyBranchName}
               onRename={onRename}
               onMarkAsRead={onMarkAsRead}
-              onMarkAsUnread={onMarkAsUnread}
+              onMarkUnread={onMarkUnread}
+              readActionPending={readActionPending}
               onArchive={onArchive}
               archiveLabel={archiveLabel}
               archiveStatus={archiveStatus}
@@ -350,7 +357,8 @@ function WorkspaceRowBody({
                   onCopyPath={onCopyPath}
                   onRename={onRename}
                   onMarkAsRead={onMarkAsRead}
-                  onMarkAsUnread={onMarkAsUnread}
+                  onMarkUnread={onMarkUnread}
+                  readActionPending={readActionPending}
                 />
               </SidebarWorkspaceRowContent>
             </SidebarWorkspaceContextMenu>
@@ -376,7 +384,8 @@ function WorkspaceRowTrailingActions({
   archiveShortcutKeys,
   onArchive,
   onMarkAsRead,
-  onMarkAsUnread,
+  onMarkUnread,
+  readActionPending,
   onCopyBranchName,
   onCopyPath,
   onRename,
@@ -395,7 +404,8 @@ function WorkspaceRowTrailingActions({
   archiveShortcutKeys?: ShortcutKey[][] | null;
   onArchive?: () => void;
   onMarkAsRead?: () => void;
-  onMarkAsUnread?: () => void;
+  onMarkUnread?: () => void;
+  readActionPending?: boolean;
   onCopyBranchName?: () => void;
   onCopyPath?: () => void;
   onRename?: () => void;
@@ -443,7 +453,8 @@ function WorkspaceRowTrailingActions({
                 onCopyBranchName={onCopyBranchName}
                 onRename={onRename}
                 onMarkAsRead={onMarkAsRead}
-                onMarkAsUnread={onMarkAsUnread}
+                onMarkUnread={onMarkUnread}
+                readActionPending={readActionPending}
                 onArchive={onArchive}
                 archiveLabel={archiveLabel}
                 archiveStatus={archiveStatus}

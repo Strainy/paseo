@@ -3018,30 +3018,31 @@ test("marks a workspace unread through the dotted RPC", async () => {
   clients.push(client);
 
   const connectPromise = client.connect();
-  mock.triggerOpen();
+  mock.triggerOpen({ features: { workspaceMarkUnread: true } });
   await connectPromise;
 
-  const markPromise = client.markWorkspaceUnread("workspace-1", "req-mark-unread");
+  const markPromise = client.markWorkspaceUnread("ws-1", "req-mark-unread");
   expect(parseSentFrame(mock.sent[0])).toEqual({
     type: "workspace.mark_unread.request",
-    workspaceId: "workspace-1",
+    workspaceId: "ws-1",
     requestId: "req-mark-unread",
   });
 
+  const markedUnreadAt = "2026-08-19T12:34:56.000Z";
   mock.triggerMessage(
     wrapSessionMessage({
       type: "workspace.mark_unread.response",
       payload: {
         requestId: "req-mark-unread",
-        workspaceId: "workspace-1",
-        markedAgentId: "agent-1",
+        workspaceId: "ws-1",
+        markedUnreadAt,
         success: true,
         error: null,
       },
     }),
   );
 
-  await expect(markPromise).resolves.toBeUndefined();
+  await expect(markPromise).resolves.toEqual({ markedUnreadAt });
 });
 
 test("searches GitHub repositories through the dotted RPC", async () => {

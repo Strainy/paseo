@@ -107,7 +107,8 @@ Workspace archive is a separate lifecycle. Archiving or removing a worktree can 
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive or Restore action changes the archived workspace.
+only the route's explicit Unarchive or Restore action changes the archived workspace. Archiving a
+workspace clears its manual unread marker.
 
 History navigation preserves the selected agent as an explicit recovery target. If both that agent
 and its workspace are archived, the workspace recovery action restores the workspace and unarchives
@@ -148,9 +149,9 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
-A finished workspace can be marked unread after it has been reviewed. The daemon restores
-`finished` attention on its newest eligible workspace-root agent without sending a new completion
-notification. Opening the workspace clears that attention through the normal focus flow.
+A user-set unread marker contributes `attention` with its persisted timestamp. Higher-priority
+`needs_input`, `failed`, and `running` activity can mask it without clearing it. Clearing workspace
+attention removes the marker plus clearable attention from the workspace's agents and terminals.
 
 ## The subagents track
 

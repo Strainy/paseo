@@ -263,11 +263,19 @@ export class WorkspaceDirectory {
       descriptorsByWorkspaceId,
     });
 
+    const activityEntriesByWorkspaceId = new Map<string, WorkspaceBucketTimestampEntry[]>();
+    this.applyMarkedUnreadContributions({
+      workspaces: includedWorkspaces,
+      descriptorsByWorkspaceId,
+      activityEntriesByWorkspaceId,
+    });
+
     // Terminal activity contributions: working terminal → running bucket.
-    const activityEntriesByWorkspaceId = this.applyTerminalContributions(
+    this.applyTerminalContributions({
       terminalContributions,
       descriptorsByWorkspaceId,
-    );
+      activityEntriesByWorkspaceId,
+    });
     this.applyProviderSubagentContributions({
       activeAgents,
       providerSubagentActivity,
@@ -304,6 +312,32 @@ export class WorkspaceDirectory {
     }
 
     return descriptorsByWorkspaceId;
+  }
+
+  private applyMarkedUnreadContributions(params: {
+    workspaces: PersistedWorkspaceRecord[];
+    descriptorsByWorkspaceId: Map<string, WorkspaceDescriptorPayload>;
+    activityEntriesByWorkspaceId: Map<string, WorkspaceBucketTimestampEntry[]>;
+  }): void {
+    const { workspaces, descriptorsByWorkspaceId, activityEntriesByWorkspaceId } = params;
+    for (const workspace of workspaces) {
+      if (!workspace.markedUnreadAt) {
+        continue;
+      }
+      const descriptor = descriptorsByWorkspaceId.get(workspace.workspaceId);
+      if (!descriptor) {
+        continue;
+      }
+      if (
+        getWorkspaceStateBucketPriority("attention") <
+        getWorkspaceStateBucketPriority(descriptor.status)
+      ) {
+        descriptor.status = "attention";
+      }
+      const entries = activityEntriesByWorkspaceId.get(workspace.workspaceId) ?? [];
+      entries.push({ bucket: "attention", changedAtIso: workspace.markedUnreadAt });
+      activityEntriesByWorkspaceId.set(workspace.workspaceId, entries);
+    }
   }
 
   private applyProviderSubagentContributions(params: {
@@ -399,15 +433,17 @@ export class WorkspaceDirectory {
   // activity timestamp entries used by `resolveStatusEnteredAt`.
   // A terminal contributes only to the workspace it carries; same-cwd siblings
   // are untouched.
-  private applyTerminalContributions(
+  private applyTerminalContributions(params: {
     terminalContributions: Array<{
       cwd: string;
       workspaceId?: string;
       activity: TerminalActivity | null;
-    }>,
-    descriptorsByWorkspaceId: Map<string, WorkspaceDescriptorPayload>,
-  ): Map<string, WorkspaceBucketTimestampEntry[]> {
-    const activityEntriesByWorkspaceId = new Map<string, WorkspaceBucketTimestampEntry[]>();
+    }>;
+    descriptorsByWorkspaceId: Map<string, WorkspaceDescriptorPayload>;
+    activityEntriesByWorkspaceId: Map<string, WorkspaceBucketTimestampEntry[]>;
+  }): void {
+    const { terminalContributions, descriptorsByWorkspaceId, activityEntriesByWorkspaceId } =
+      params;
     for (const { workspaceId, activity } of terminalContributions) {
       if (!activity || !workspaceId) {
         continue;
@@ -427,7 +463,6 @@ export class WorkspaceDirectory {
       entries.push({ bucket, changedAtIso: new Date(activity.changedAt).toISOString() });
       activityEntriesByWorkspaceId.set(workspaceId, entries);
     }
-    return activityEntriesByWorkspaceId;
   }
 
   // Aggregate the workspace-level `statusEnteredAt` from its activity sources.

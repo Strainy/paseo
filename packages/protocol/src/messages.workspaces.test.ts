@@ -10,38 +10,63 @@ import {
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
-  test("parses mark-unread request and response", () => {
+  test("parses mark-unread requests and responses", () => {
     expect(
       SessionInboundMessageSchema.parse({
         type: "workspace.mark_unread.request",
-        workspaceId: "workspace-1",
         requestId: "req-mark-unread",
+        workspaceId: "ws-1",
       }),
     ).toEqual({
       type: "workspace.mark_unread.request",
-      workspaceId: "workspace-1",
       requestId: "req-mark-unread",
+      workspaceId: "ws-1",
     });
 
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
     expect(
       SessionOutboundMessageSchema.parse({
         type: "workspace.mark_unread.response",
         payload: {
           requestId: "req-mark-unread",
-          workspaceId: "workspace-1",
-          markedAgentId: "agent-1",
+          workspaceId: "ws-1",
+          markedUnreadAt,
           success: true,
           error: null,
         },
       }),
-    ).toEqual({
+    ).toMatchObject({
       type: "workspace.mark_unread.response",
+      payload: { workspaceId: "ws-1", markedUnreadAt, success: true },
+    });
+  });
+
+  test("parses workspace attention clears with terminal results", () => {
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "workspace.clear_attention.response",
+        payload: {
+          requestId: "req-clear",
+          workspaceId: "ws-1",
+          clearedAgentIds: ["agent-1"],
+          clearedTerminalIds: ["terminal-1"],
+          results: [
+            {
+              workspaceId: "ws-1",
+              clearedAgentIds: ["agent-1"],
+              clearedTerminalIds: ["terminal-1"],
+              success: true,
+              error: null,
+            },
+          ],
+          success: true,
+          error: null,
+        },
+      }),
+    ).toMatchObject({
       payload: {
-        requestId: "req-mark-unread",
-        workspaceId: "workspace-1",
-        markedAgentId: "agent-1",
-        success: true,
-        error: null,
+        clearedTerminalIds: ["terminal-1"],
+        results: [{ clearedTerminalIds: ["terminal-1"] }],
       },
     });
   });
@@ -723,6 +748,26 @@ describe("workspace message schemas", () => {
       scripts: [],
     } as const;
     expect(WorkspaceDescriptorPayloadSchema.parse(baseWorkspace).statusEnteredAt).toBeNull();
+  });
+
+  test("preserves a workspace manual unread timestamp", () => {
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+    const parsed = WorkspaceDescriptorPayloadSchema.parse({
+      id: "ws-marked-unread",
+      projectId: "proj",
+      projectDisplayName: "repo",
+      projectRootPath: "/repo",
+      workspaceDirectory: "/repo",
+      projectKind: "git",
+      workspaceKind: "worktree",
+      name: "feature",
+      markedUnreadAt,
+      status: "attention",
+      activityAt: null,
+      scripts: [],
+    });
+
+    expect(parsed.markedUnreadAt).toBe(markedUnreadAt);
   });
 
   test("preserves statusEnteredAt when present", () => {
