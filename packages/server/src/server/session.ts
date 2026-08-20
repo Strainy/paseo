@@ -2506,6 +2506,15 @@ export class Session {
         return this.handleWorkspaceCreateRequest(msg);
       case "workspace.clear_attention.request":
         return this.handleWorkspaceClearAttentionRequest(msg);
+      case "workspace.mark_unread.request":
+        return this.handleWorkspaceMarkUnreadRequest(msg);
+      default:
+        return this.dispatchWorkspaceMetadataMessage(msg);
+    }
+  }
+
+  private dispatchWorkspaceMetadataMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
       case "workspace.title.set.request":
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
       case "workspace.pin.set.request":
@@ -4885,6 +4894,7 @@ export class Session {
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
+      markedUnreadAt: workspace.markedUnreadAt,
       archivingAt: null,
       status: "done",
       statusEnteredAt: null,
@@ -4979,6 +4989,7 @@ export class Session {
       ...(result.workspace.labels && result.workspace.labels.length > 0
         ? { labels: result.workspace.labels }
         : {}),
+      markedUnreadAt: result.workspace.markedUnreadAt,
       archivingAt: null,
       status: "done",
       statusEnteredAt: result.workspace.createdAt,
@@ -6736,6 +6747,7 @@ export class Session {
       const results = requestedWorkspaceIds.map((requestedWorkspaceId) => ({
         workspaceId: requestedWorkspaceId,
         clearedAgentIds: [],
+        clearedTerminalIds: [],
         success: false,
         error: message,
       }));
@@ -6745,6 +6757,7 @@ export class Session {
           requestId,
           workspaceId,
           clearedAgentIds: [],
+          clearedTerminalIds: [],
           results,
           success: false,
           error: message,
@@ -6755,12 +6768,14 @@ export class Session {
     const results: Array<{
       workspaceId: string;
       clearedAgentIds: string[];
+      clearedTerminalIds: string[];
       success: boolean;
       error: string | null;
     }> = [];
 
     for (const requestedWorkspaceId of requestedWorkspaceIds) {
       const clearedAgentIds: string[] = [];
+      const clearedTerminalIds: string[] = [];
       try {
         const workspace = await this.workspaceRegistry.get(requestedWorkspaceId);
         if (!workspace || workspace.archivedAt) {
@@ -6816,10 +6831,27 @@ export class Session {
           clearedAgentIds.push(agentId);
         }
 
+        clearedTerminalIds.push(...(await this.clearWorkspaceTerminalAttention(workspace)));
+
+        if (workspace.markedUnreadAt !== null) {
+          const updated = await this.workspaceRegistry.update(
+            workspace.workspaceId,
+            (existing) => ({
+              ...existing,
+              markedUnreadAt: null,
+              updatedAt: new Date().toISOString(),
+            }),
+          );
+          if (!updated) {
+            throw new Error(`Workspace not found: ${requestedWorkspaceId}`);
+          }
+        }
+
         await this.emitWorkspaceUpdateForWorkspaceId(workspace.workspaceId);
         results.push({
           workspaceId: requestedWorkspaceId,
           clearedAgentIds,
+          clearedTerminalIds,
           success: true,
           error: null,
         });
@@ -6832,6 +6864,7 @@ export class Session {
         results.push({
           workspaceId: requestedWorkspaceId,
           clearedAgentIds,
+          clearedTerminalIds,
           success: false,
           error: message,
         });
@@ -6839,6 +6872,7 @@ export class Session {
     }
 
     const clearedAgentIds = results.flatMap((result) => result.clearedAgentIds);
+    const clearedTerminalIds = results.flatMap((result) => result.clearedTerminalIds);
     const failedResults = results.filter((result) => !result.success);
     this.emit({
       type: "workspace.clear_attention.response",
@@ -6846,6 +6880,7 @@ export class Session {
         requestId,
         workspaceId,
         clearedAgentIds,
+        clearedTerminalIds,
         results,
         success: failedResults.length === 0,
         error:
@@ -6857,6 +6892,75 @@ export class Session {
                 .join("; "),
       },
     });
+  }
+
+  private async clearWorkspaceTerminalAttention(
+    workspace: PersistedWorkspaceRecord,
+  ): Promise<string[]> {
+    const terminalManager = this.terminalManager;
+    if (!terminalManager) {
+      return [];
+    }
+    const terminals = await terminalManager.getTerminals(workspace.cwd, {
+      workspaceId: workspace.workspaceId,
+    });
+    const clearedTerminalIds: string[] = [];
+    for (const terminal of terminals) {
+      if (await terminalManager.clearTerminalAttention(terminal.id)) {
+        clearedTerminalIds.push(terminal.id);
+      }
+    }
+    return clearedTerminalIds;
+  }
+
+  private async handleWorkspaceMarkUnreadRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.mark_unread.request" }>,
+  ): Promise<void> {
+    const { requestId, workspaceId } = request;
+    try {
+      const markedUnreadAt = new Date().toISOString();
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => {
+        if (existing.archivedAt) {
+          throw new Error(`Workspace not found: ${workspaceId}`);
+        }
+        return {
+          ...existing,
+          markedUnreadAt,
+          updatedAt: markedUnreadAt,
+        };
+      });
+      if (!updated) {
+        throw new Error(`Workspace not found: ${workspaceId}`);
+      }
+
+      await this.emitWorkspaceUpdateForWorkspaceId(workspaceId);
+      this.emit({
+        type: "workspace.mark_unread.response",
+        payload: {
+          requestId,
+          workspaceId,
+          markedUnreadAt,
+          success: true,
+          error: null,
+        },
+      });
+    } catch (error) {
+      const message = getErrorMessageOr(error, "Failed to mark workspace unread");
+      this.sessionLogger.error(
+        { err: error, workspaceId, requestId },
+        "Failed to mark workspace unread",
+      );
+      this.emit({
+        type: "workspace.mark_unread.response",
+        payload: {
+          requestId,
+          workspaceId,
+          markedUnreadAt: null,
+          success: false,
+          error: message,
+        },
+      });
+    }
   }
 
   private async handleFetchAgent(agentIdOrIdentifier: string, requestId: string): Promise<void> {

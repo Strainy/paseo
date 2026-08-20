@@ -83,6 +83,7 @@ class WorkspaceStatus {
       projectKind: "git",
       workspaceKind: workspace.kind,
       name: workspace.displayName,
+      markedUnreadAt: workspace.markedUnreadAt ?? null,
       archivingAt: null,
       status: "done",
       activityAt: null,
@@ -105,6 +106,14 @@ class WorkspaceStatus {
 
   hasSiblingWorkspaceSameCwd(): void {
     this.workspaces.push(this.sameCwdWorkspace);
+  }
+
+  markUnread(markedUnreadAt: string, workspaceId = this.workspace.workspaceId): void {
+    const workspace = this.workspaces.find((candidate) => candidate.workspaceId === workspaceId);
+    if (!workspace) {
+      throw new Error(`Unknown workspace: ${workspaceId}`);
+    }
+    workspace.markedUnreadAt = markedUnreadAt;
   }
 
   // A root agent owned by a specific workspace, even though both same-cwd
@@ -344,6 +353,44 @@ describe("WorkspaceDirectory", () => {
     await expect(workspace.workspaceStatuses()).resolves.toEqual({
       "workspace-1": "done",
       "workspace-1-sibling": "needs_input",
+    });
+  });
+
+  test("manual unread contributes attention with its persisted timestamp", async () => {
+    const workspace = new WorkspaceStatus();
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+
+    workspace.markUnread(markedUnreadAt);
+
+    await expect(workspace.workspaceDescriptor()).resolves.toMatchObject({
+      markedUnreadAt,
+      status: "attention",
+      statusEnteredAt: markedUnreadAt,
+    });
+  });
+
+  test("running activity masks manual unread without clearing its marker", async () => {
+    const workspace = new WorkspaceStatus();
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+
+    workspace.markUnread(markedUnreadAt);
+    workspace.hasRootAgent({ id: "running-agent", status: "running" });
+
+    await expect(workspace.workspaceDescriptor()).resolves.toMatchObject({
+      markedUnreadAt,
+      status: "running",
+    });
+  });
+
+  test("same-cwd manual unread contributes only to the marked workspace", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasSiblingWorkspaceSameCwd();
+    workspace.markUnread("2026-08-19T12:34:56.000Z", "workspace-1-sibling");
+
+    await expect(workspace.workspaceStatuses()).resolves.toEqual({
+      "workspace-1": "done",
+      "workspace-1-sibling": "attention",
     });
   });
 

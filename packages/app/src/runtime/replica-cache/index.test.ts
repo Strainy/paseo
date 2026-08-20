@@ -353,6 +353,27 @@ describe("ReplicaCache", () => {
     ]);
   });
 
+  it("restores a manual unread marker while running activity masks its status", async () => {
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const cached = directory();
+    const cachedWorkspace = cached.workspaces.get("workspace-1");
+    if (!cachedWorkspace) throw new Error("Expected seeded workspace");
+    cached.workspaces.set("workspace-1", {
+      ...cachedWorkspace,
+      status: "running",
+      markedUnreadAt,
+    });
+    writer.commitDirectory(SERVER_ID, cached);
+    await writer.flush();
+
+    const reader = createCache(storage);
+    const restored = await reader.readWorkspace(SERVER_ID, "workspace-1");
+
+    expect(restored?.workspace).toMatchObject({ status: "running", markedUnreadAt });
+  });
+
   it("treats a corrupt row as a scoped miss", async () => {
     const storage = new MemoryStorage();
     storage.rows.set(`${SERVER_ID}:agent:agent-1`, {

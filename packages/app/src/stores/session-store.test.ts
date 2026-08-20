@@ -26,6 +26,7 @@ function createWorkspace(
     workspaceKind: input.workspaceKind ?? "local_checkout",
     name: input.name ?? "main",
     status: input.status ?? "done",
+    markedUnreadAt: input.markedUnreadAt ?? null,
     statusEnteredAt: input.statusEnteredAt ?? null,
     archivingAt: input.archivingAt ?? null,
     diffStat: input.diffStat ?? null,
@@ -526,6 +527,34 @@ describe("normalizeWorkspaceDescriptor", () => {
     const workspace = normalizeWorkspaceDescriptor(payload);
 
     expect(workspace.archivingAt).toBeNull();
+  });
+
+  it("normalizes markedUnreadAt to a nullable timestamp", () => {
+    const basePayload = {
+      id: "1",
+      projectId: "1",
+      projectDisplayName: "Project 1",
+      projectRootPath: "/repo",
+      workspaceDirectory: "/repo",
+      projectKind: "git",
+      workspaceKind: "checkout",
+      name: "main",
+      archivingAt: null,
+      status: "done",
+      statusEnteredAt: null,
+      activityAt: null,
+      diffStat: null,
+      scripts: [],
+    } satisfies Omit<WorkspaceDescriptorPayload, "markedUnreadAt">;
+
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+    const marked = normalizeWorkspaceDescriptor({ ...basePayload, markedUnreadAt });
+    const cleared = normalizeWorkspaceDescriptor({ ...basePayload, markedUnreadAt: null });
+    const missing = normalizeWorkspaceDescriptor(basePayload);
+
+    expect(marked.markedUnreadAt).toBe(markedUnreadAt);
+    expect(cleared.markedUnreadAt).toBeNull();
+    expect(missing.markedUnreadAt).toBeNull();
   });
 
   it("normalizes statusEnteredAt strings to Date and missing or null values to null", () => {

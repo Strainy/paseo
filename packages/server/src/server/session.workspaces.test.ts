@@ -1669,14 +1669,15 @@ test("archive emits an authoritative agent_update upsert for subscribed clients"
   });
 });
 
-test("workspace clear attention clears stored-only agents and responds", async () => {
+test("workspace clear attention clears the marker, stored agents, and owned terminals", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  const workspace = createPersistedWorkspaceRecord({
+  let workspace = createPersistedWorkspaceRecord({
     workspaceId: REPO_CWD,
     projectId: REPO_CWD,
     cwd: REPO_CWD,
     kind: "directory",
     displayName: "repo",
+    markedUnreadAt: "2026-03-30T15:30:00.000Z",
     createdAt: "2026-03-30T15:00:00.000Z",
     updatedAt: "2026-03-30T15:00:00.000Z",
   });
@@ -1695,11 +1696,40 @@ test("workspace clear attention clears stored-only agents and responds", async (
     requiresAttention: true,
     attentionReason: "finished",
   });
-  const session = createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) });
+  const terminals = [
+    { id: "terminal-owned", workspaceId: workspace.workspaceId },
+    { id: "terminal-sibling", workspaceId: "same-cwd-sibling" },
+  ];
+  const getTerminals = vi.fn(async (_cwd: string, options?: { workspaceId?: string }) =>
+    terminals.filter(
+      (terminal) => !options?.workspaceId || terminal.workspaceId === options.workspaceId,
+    ),
+  );
+  const clearTerminalAttention = vi.fn(async (terminalId: string) => {
+    if (terminalId === "terminal-sibling") {
+      throw new Error("same-cwd sibling terminal must not be cleared");
+    }
+    return terminalId === "terminal-owned";
+  });
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    terminalManager: asTerminalManager({
+      subscribeTerminalsChanged: () => () => {},
+      getTerminals,
+      clearTerminalAttention,
+    }),
+  });
 
   session.workspaceRegistry.list = async () => [workspace];
   session.workspaceRegistry.get = async (id: string) =>
     id === workspace.workspaceId ? workspace : null;
+  session.workspaceRegistry.update = async (id, updater) => {
+    if (id !== workspace.workspaceId) {
+      return null;
+    }
+    workspace = updater(workspace);
+    return workspace;
+  };
   session.projectRegistry.list = async () => [project];
   session.projectRegistry.get = async (id: string) => (id === project.projectId ? project : null);
   session.agentStorage.get = async (agentId: string) =>
@@ -1728,10 +1758,26 @@ test("workspace clear attention clears stored-only agents and responds", async (
   expect(storedRecord.requiresAttention).toBe(false);
   expect(storedRecord.attentionReason).toBeNull();
   expect(storedRecord.attentionTimestamp).toBeNull();
+  expect(workspace.markedUnreadAt).toBeNull();
+  expect(getTerminals).toHaveBeenCalledWith(workspace.cwd, {
+    workspaceId: workspace.workspaceId,
+  });
+  expect(clearTerminalAttention).toHaveBeenCalledTimes(1);
+  expect(clearTerminalAttention).toHaveBeenCalledWith("terminal-owned");
   expect(findByType(emitted, "workspace.clear_attention.response").payload).toMatchObject({
     requestId: "req-1",
     workspaceId: workspace.workspaceId,
     clearedAgentIds: [storedRecord.id],
+    clearedTerminalIds: ["terminal-owned"],
+    results: [
+      {
+        workspaceId: workspace.workspaceId,
+        clearedAgentIds: [storedRecord.id],
+        clearedTerminalIds: ["terminal-owned"],
+        success: true,
+        error: null,
+      },
+    ],
     success: true,
     error: null,
   });
@@ -1740,6 +1786,101 @@ test("workspace clear attention clears stored-only agents and responds", async (
   if (agentUpdate.payload.kind === "upsert") {
     expect(agentUpdate.payload.agent.requiresAttention).toBe(false);
   }
+});
+
+test("workspace mark unread persists the marker and projects it into descriptors", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  let workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-mark-unread",
+    projectId: "project-mark-unread",
+    cwd: REPO_CWD,
+    kind: "directory",
+    displayName: "repo",
+    createdAt: "2026-08-19T12:00:00.000Z",
+    updatedAt: "2026-08-19T12:00:00.000Z",
+  });
+  const project = createPersistedProjectRecord({
+    projectId: workspace.projectId,
+    rootPath: workspace.cwd,
+    kind: "non_git",
+    displayName: "repo",
+    createdAt: workspace.createdAt,
+    updatedAt: workspace.updatedAt,
+  });
+  const session = createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) });
+  session.workspaceRegistry.list = async () => [workspace];
+  session.workspaceRegistry.get = async (workspaceId: string) =>
+    workspaceId === workspace.workspaceId ? workspace : null;
+  session.workspaceRegistry.update = async (workspaceId, updater) => {
+    if (workspaceId !== workspace.workspaceId) {
+      return null;
+    }
+    workspace = updater(workspace);
+    return workspace;
+  };
+  session.projectRegistry.list = async () => [project];
+  session.projectRegistry.get = async (projectId: string) =>
+    projectId === project.projectId ? project : null;
+
+  await session.handleMessage({
+    type: "workspace.mark_unread.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "req-mark-unread",
+  });
+
+  expect(workspace.markedUnreadAt).toEqual(expect.any(String));
+  expect(findByType(emitted, "workspace.mark_unread.response").payload).toEqual({
+    requestId: "req-mark-unread",
+    workspaceId: workspace.workspaceId,
+    markedUnreadAt: workspace.markedUnreadAt,
+    success: true,
+    error: null,
+  });
+  await expect(session.describeWorkspaceRecord(workspace, project)).resolves.toMatchObject({
+    id: workspace.workspaceId,
+    markedUnreadAt: workspace.markedUnreadAt,
+  });
+});
+
+test.each([
+  { label: "missing", workspace: null },
+  {
+    label: "archived",
+    workspace: createPersistedWorkspaceRecord({
+      workspaceId: "ws-archived",
+      projectId: "project-archived",
+      cwd: REPO_CWD,
+      kind: "directory",
+      displayName: "repo",
+      createdAt: "2026-08-19T12:00:00.000Z",
+      updatedAt: "2026-08-19T12:30:00.000Z",
+      archivedAt: "2026-08-19T12:30:00.000Z",
+    }),
+  },
+])("workspace mark unread rejects a $label workspace", async ({ workspace }) => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) });
+  session.workspaceRegistry.update = async (workspaceId, updater) => {
+    if (!workspace || workspaceId !== workspace.workspaceId) {
+      return null;
+    }
+    return updater(workspace);
+  };
+
+  const workspaceId = workspace?.workspaceId ?? "ws-missing";
+  await session.handleMessage({
+    type: "workspace.mark_unread.request",
+    workspaceId,
+    requestId: "req-mark-unread-failure",
+  });
+
+  expect(findByType(emitted, "workspace.mark_unread.response").payload).toEqual({
+    requestId: "req-mark-unread-failure",
+    workspaceId,
+    markedUnreadAt: null,
+    success: false,
+    error: `Workspace not found: ${workspaceId}`,
+  });
 });
 
 test("workspace clear attention responds with an error instead of timing out", async () => {
