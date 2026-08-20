@@ -239,6 +239,8 @@ const StoredWorkspaceSchema = z.strictObject({
   // dropped them painted its row without its chips and stayed that way: the directory cursor is
   // current on reconnect, so the daemon has nothing newer to send back.
   labels: z.array(z.string()).optional(),
+  // COMPAT(workspaceMarkUnread): added in v0.5.0, remove optional after 2027-02-19.
+  markedUnreadAt: IsoDateSchema.nullable().optional(),
   status: z.enum(["needs_input", "failed", "running", "attention", "done"]),
   statusEnteredAt: IsoDateSchema.nullable(),
   activityAt: z.null(),
@@ -564,6 +566,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     title: workspace.title ?? null,
     pinnedAt: workspace.pinnedAt ?? null,
     labels: workspace.labels,
+    markedUnreadAt: workspace.markedUnreadAt ?? null,
     status: workspace.status,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,
     activityAt: null,

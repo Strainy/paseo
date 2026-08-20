@@ -93,6 +93,12 @@ const PersistedWorkspaceRecordSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
+  // COMPAT(workspaceMarkUnread): added in v0.5.0, remove optional parsing after 2027-02-19.
+  markedUnreadAt: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
 });
 
 export type PersistedProjectRecord = z.infer<typeof PersistedProjectRecordSchema>;
@@ -563,6 +569,7 @@ export class FileBackedWorkspaceRegistry
       ...existing,
       updatedAt: archivedAt,
       archivedAt,
+      markedUnreadAt: null,
       ...(context?.autoArchivedChangeRequestUrl
         ? { autoArchivedChangeRequestUrl: context.autoArchivedChangeRequestUrl }
         : {}),
@@ -674,6 +681,7 @@ export function createPersistedWorkspaceRecord(input: {
   autoArchivedChangeRequestUrl?: string | null;
   pinnedAt?: string | null;
   labels?: string[];
+  markedUnreadAt?: string | null;
 }): PersistedWorkspaceRecord {
   return PersistedWorkspaceRecordSchema.parse({
     ...input,
@@ -686,6 +694,7 @@ export function createPersistedWorkspaceRecord(input: {
     archivedAt: input.archivedAt ?? null,
     autoArchivedChangeRequestUrl: input.autoArchivedChangeRequestUrl ?? null,
     pinnedAt: input.pinnedAt ?? null,
+    markedUnreadAt: input.markedUnreadAt ?? null,
   });
 }
 

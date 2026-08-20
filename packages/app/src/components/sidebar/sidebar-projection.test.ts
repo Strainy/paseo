@@ -30,6 +30,7 @@ function makeWorkspace(
     currentBranch: null,
     statusBucket,
     statusEnteredAt: null,
+    markedUnreadAt: null,
     archivingAt: null,
     diffStat: null,
     prHint: null,

@@ -51,7 +51,7 @@ import * as Clipboard from "expo-clipboard";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
-import { useClearWorkspaceAttention } from "@/hooks/use-clear-workspace-attention";
+import { useWorkspaceReadController } from "@/hooks/use-workspace-read-controller";
 import {
   SidebarWorkspaceRowFrame,
   SidebarWorkspaceRowContent,
@@ -123,6 +123,7 @@ interface StatusWorkspaceListProps {
   onWorkspacePress?: () => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
+  supportsMarkUnreadByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspaceEntry[]) => void;
   listHeaderComponent?: ReactNode;
@@ -141,6 +142,7 @@ export function SidebarStatusWorkspaceList({
   onWorkspacePress,
   hostBadgeByServerId,
   supportsPinningByServerId,
+  supportsMarkUnreadByServerId,
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
   listHeaderComponent,
@@ -183,6 +185,7 @@ export function SidebarStatusWorkspaceList({
         shortcutNumber={statusShortcutIndex.get(workspace.workspaceKey) ?? null}
         showShortcutBadge={showShortcutBadges}
         canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+        supportsMarkUnread={supportsMarkUnreadByServerId.get(workspace.serverId) === true}
         onToggleWorkspacePin={onToggleWorkspacePin}
         onWorkspacePress={onWorkspacePress}
         drag={drag}
@@ -198,6 +201,7 @@ export function SidebarStatusWorkspaceList({
       showShortcutBadges,
       statusShortcutIndex,
       supportsPinningByServerId,
+      supportsMarkUnreadByServerId,
     ],
   );
   const content = (
@@ -243,6 +247,7 @@ export function SidebarStatusWorkspaceList({
           onWorkspacePress={onWorkspacePress}
           hostBadgeByServerId={hostBadgeByServerId}
           supportsPinningByServerId={supportsPinningByServerId}
+          supportsMarkUnreadByServerId={supportsMarkUnreadByServerId}
           onToggleWorkspacePin={onToggleWorkspacePin}
         />
       )}
@@ -283,6 +288,7 @@ function StatusGroupList({
   onWorkspacePress,
   hostBadgeByServerId,
   supportsPinningByServerId,
+  supportsMarkUnreadByServerId,
   onToggleWorkspacePin,
 }: {
   groups: SidebarWorkspaceGroup[];
@@ -293,6 +299,7 @@ function StatusGroupList({
   onWorkspacePress?: () => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
+  supportsMarkUnreadByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
   return (
@@ -308,6 +315,7 @@ function StatusGroupList({
           onWorkspacePress={onWorkspacePress}
           hostBadgeByServerId={hostBadgeByServerId}
           supportsPinningByServerId={supportsPinningByServerId}
+          supportsMarkUnreadByServerId={supportsMarkUnreadByServerId}
           onToggleWorkspacePin={onToggleWorkspacePin}
         />
       ))}
@@ -324,6 +332,7 @@ function StatusGroupRows({
   onWorkspacePress,
   hostBadgeByServerId,
   supportsPinningByServerId,
+  supportsMarkUnreadByServerId,
   onToggleWorkspacePin,
 }: {
   group: SidebarWorkspaceGroup;
@@ -334,6 +343,7 @@ function StatusGroupRows({
   onWorkspacePress?: () => void;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
+  supportsMarkUnreadByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
 }) {
   const {
@@ -363,6 +373,7 @@ function StatusGroupRows({
               shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
               showShortcutBadge={showShortcutBadges}
               canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+              supportsMarkUnread={supportsMarkUnreadByServerId.get(workspace.serverId) === true}
               onToggleWorkspacePin={onToggleWorkspacePin}
               onWorkspacePress={onWorkspacePress}
             />
@@ -499,6 +510,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   shortcutNumber,
   showShortcutBadge,
   canPin,
+  supportsMarkUnread,
   onToggleWorkspacePin,
   reserveIdleStatusIndicatorSpace = true,
   inStatusGroup = true,
@@ -514,6 +526,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   canPin: boolean;
+  supportsMarkUnread: boolean;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   reserveIdleStatusIndicatorSpace?: boolean;
   /**
@@ -547,6 +560,7 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
       shortcutNumber={shortcutNumber}
       showShortcutBadge={showShortcutBadge}
       canPin={canPin}
+      supportsMarkUnread={supportsMarkUnread}
       onToggleWorkspacePin={onToggleWorkspacePin}
       reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
       inStatusGroup={inStatusGroup}
@@ -567,6 +581,7 @@ function StatusWorkspaceRowWithMenu({
   shortcutNumber,
   showShortcutBadge,
   canPin,
+  supportsMarkUnread,
   onToggleWorkspacePin,
   reserveIdleStatusIndicatorSpace = true,
   inStatusGroup = true,
@@ -583,6 +598,7 @@ function StatusWorkspaceRowWithMenu({
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   canPin: boolean;
+  supportsMarkUnread: boolean;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   reserveIdleStatusIndicatorSpace?: boolean;
   /**
@@ -669,15 +685,22 @@ function StatusWorkspaceRowWithMenu({
   const onTogglePin = canPin ? handleTogglePin : undefined;
 
   const archiveShortcutKeys = useShortcutKeys("archive-workspace");
-  const { hasClearableAttention, clearAttention } = useClearWorkspaceAttention({
+  const readController = useWorkspaceReadController({
     serverId: workspace.serverId,
     workspaceId: workspace.workspaceId,
+    status: workspace.statusBucket,
+    markedUnreadAt: workspace.markedUnreadAt,
+    supportsMarkUnread,
   });
-  const handleMarkAsRead = useCallback(() => {
-    void clearAttention().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to mark workspace as read");
+  const handleReadAction = useCallback(() => {
+    void readController.performAction().catch((error) => {
+      const fallbackKey =
+        readController.action === "mark_unread"
+          ? "sidebar.workspace.toasts.markUnreadFailed"
+          : "sidebar.workspace.toasts.markAsReadFailed";
+      toast.error(error instanceof Error ? error.message : t(fallbackKey));
     });
-  }, [clearAttention, toast]);
+  }, [readController, t, toast]);
 
   useKeyboardActionHandler({
     handlerId: `workspace-archive-${workspace.workspaceKey}`,
@@ -709,7 +732,9 @@ function StatusWorkspaceRowWithMenu({
         onCopyBranchName={workspace.projectKind === "git" ? handleCopyBranchName : undefined}
         onCopyPath={handleCopyPath}
         onRename={handleOpenRename}
-        onMarkAsRead={hasClearableAttention ? handleMarkAsRead : undefined}
+        onMarkAsRead={readController.action === "mark_as_read" ? handleReadAction : undefined}
+        onMarkUnread={readController.action === "mark_unread" ? handleReadAction : undefined}
+        readActionPending={readController.pending}
         archiveShortcutKeys={selected ? archiveShortcutKeys : null}
         isPinned={isPinned}
         onTogglePin={onTogglePin}
@@ -751,6 +776,8 @@ interface StatusWorkspaceRowInnerProps {
   onCopyPath?: () => void;
   onRename?: () => void;
   onMarkAsRead?: () => void;
+  onMarkUnread?: () => void;
+  readActionPending?: boolean;
   archiveShortcutKeys?: ShortcutKey[][] | null;
   isPinned?: boolean;
   onTogglePin?: () => void;
@@ -797,6 +824,8 @@ function StatusWorkspaceRowInnerContent({
   onCopyPath,
   onRename,
   onMarkAsRead,
+  onMarkUnread,
+  readActionPending,
   archiveShortcutKeys,
   isPinned,
   onTogglePin,
@@ -892,6 +921,8 @@ function StatusWorkspaceRowInnerContent({
               onCopyBranchName={onCopyBranchName}
               onRename={onRename}
               onMarkAsRead={onMarkAsRead}
+              onMarkUnread={onMarkUnread}
+              readActionPending={readActionPending}
               onArchive={onArchive}
               archiveLabel={archiveLabel}
               archiveStatus={archiveStatus}
@@ -939,6 +970,8 @@ function StatusWorkspaceRowInnerContent({
                     onCopyBranchName={onCopyBranchName}
                     onRename={onRename}
                     onMarkAsRead={onMarkAsRead}
+                    onMarkUnread={onMarkUnread}
+                    readActionPending={readActionPending}
                     onArchive={onArchive}
                     archiveLabel={archiveLabel}
                     archiveStatus={archiveStatus}
@@ -969,6 +1002,8 @@ function StatusWorkspaceActionSlot({
   onCopyBranchName,
   onRename,
   onMarkAsRead,
+  onMarkUnread,
+  readActionPending,
   onArchive,
   archiveLabel,
   archiveStatus,
@@ -988,6 +1023,8 @@ function StatusWorkspaceActionSlot({
   onCopyBranchName?: () => void;
   onRename?: () => void;
   onMarkAsRead?: () => void;
+  onMarkUnread?: () => void;
+  readActionPending?: boolean;
   onArchive?: () => void;
   archiveLabel?: string;
   archiveStatus?: "idle" | "pending" | "success";
@@ -1015,6 +1052,8 @@ function StatusWorkspaceActionSlot({
             onCopyBranchName={onCopyBranchName}
             onRename={onRename}
             onMarkAsRead={onMarkAsRead}
+            onMarkUnread={onMarkUnread}
+            readActionPending={readActionPending}
             onArchive={onArchive}
             archiveLabel={archiveLabel}
             archiveStatus={archiveStatus}

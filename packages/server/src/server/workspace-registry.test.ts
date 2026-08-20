@@ -41,6 +41,7 @@ describe("resolveWorkspaceName", () => {
     });
     expect(resolveWorkspaceDisplayName(record)).toBe("Renamed");
     expect(resolveWorkspaceDisplayName({ ...record, title: null })).toBe("main");
+    expect(record.markedUnreadAt).toBeNull();
   });
 });
 
@@ -434,6 +435,7 @@ describe("workspace registries", () => {
         cwd: "/tmp/repo",
         kind: "local_checkout",
         displayName: "feature/workspace",
+        markedUnreadAt: "2026-03-02T12:00:00.000Z",
         createdAt: "2026-03-01T00:00:00.000Z",
         updatedAt: "2026-03-02T00:00:00.000Z",
       }),
@@ -443,10 +445,36 @@ describe("workspace registries", () => {
     const archived = await workspaceRegistry.get("/tmp/repo");
     expect(archived?.displayName).toBe("feature/workspace");
     expect(archived?.archivedAt).toBe("2026-03-03T00:00:00.000Z");
+    expect(archived?.markedUnreadAt).toBeNull();
 
     await workspaceRegistry.remove("/tmp/repo");
     expect(await workspaceRegistry.get("/tmp/repo")).toBeNull();
     expect(await workspaceRegistry.list()).toEqual([]);
+  });
+
+  test("persists a workspace unread marker across registry reload", async () => {
+    const markedUnreadAt = "2026-08-19T12:34:56.000Z";
+    await workspaceRegistry.initialize();
+    await workspaceRegistry.upsert(
+      createPersistedWorkspaceRecord({
+        workspaceId: "workspace-marked-unread",
+        projectId: "project-one",
+        cwd: "/tmp/repo",
+        kind: "local_checkout",
+        displayName: "main",
+        markedUnreadAt,
+        createdAt: "2026-08-19T12:00:00.000Z",
+        updatedAt: markedUnreadAt,
+      }),
+    );
+
+    const reloaded = new FileBackedWorkspaceRegistry(
+      path.join(tmpDir, "projects", "workspaces.json"),
+      logger,
+    );
+    await reloaded.initialize();
+
+    expect((await reloaded.get("workspace-marked-unread"))?.markedUnreadAt).toBe(markedUnreadAt);
   });
 
   test("refreshes workspace archive timestamps when an archive is repeated", async () => {

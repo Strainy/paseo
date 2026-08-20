@@ -30,6 +30,7 @@ function workspaceWithForge(forge: string | undefined, prUrl: string): Workspace
     name: "feature",
     title: null,
     status: "done",
+    markedUnreadAt: null,
     statusEnteredAt: null,
     archivingAt: null,
     diffStat: null,
@@ -86,6 +87,17 @@ describe("createSidebarWorkspaceEntry workspace directory label", () => {
     const entry = createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor });
 
     expect(entry.workspaceDirectoryLabel).toBe("~/external/feature");
+  });
+});
+
+describe("createSidebarWorkspaceEntry unread marker", () => {
+  it("copies markedUnreadAt into the row projection", () => {
+    const descriptor = workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42");
+    descriptor.markedUnreadAt = "2026-08-19T12:34:56.000Z";
+
+    const entry = createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor });
+
+    expect(entry.markedUnreadAt).toBe("2026-08-19T12:34:56.000Z");
   });
 });
 
@@ -158,7 +170,9 @@ function workspace(input: {
     projectKind: "git",
     workspaceKind: input.name === "main" ? "local_checkout" : "worktree",
     name: input.name,
+    labels: [],
     status: input.status ?? "done",
+    markedUnreadAt: null,
     statusEnteredAt: input.statusEnteredAt ?? null,
     archivingAt: null,
     diffStat: null,

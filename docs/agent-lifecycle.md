@@ -94,7 +94,8 @@ Workspace archive is a separate lifecycle. Archiving or removing a worktree can 
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive or Restore action changes the archived workspace.
+only the route's explicit Unarchive or Restore action changes the archived workspace. Archiving a
+workspace clears its manual unread marker.
 
 History navigation preserves the selected agent as an explicit recovery target. If both that agent
 and its workspace are archived, the workspace recovery action restores the workspace and unarchives
@@ -132,6 +133,10 @@ Agent lifecycle status stays literal: a parent agent is `idle` when its own turn
 Workspace status is an aggregate activity signal computed **per `workspaceId`**. Ownership is never derived from `cwd` — many workspaces may share one directory, and same-`cwd` siblings do not clump under one status. Root agents and cross-workspace subagents contribute their normal state bucket to their own workspace. Same-workspace descendants contribute `running` to the nearest ancestor in that workspace; their non-running attention, permission, and error states stay in the parent's subagents track. This makes a cross-workspace subagent behave like a detached agent for workspace visibility and status without removing its parent relationship.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
+
+A user-set unread marker contributes `attention` with its persisted timestamp. Higher-priority
+`needs_input`, `failed`, and `running` activity can mask it without clearing it. Clearing workspace
+attention removes the marker plus clearable attention from the workspace's agents and terminals.
 
 ## The subagents track
 
