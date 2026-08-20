@@ -93,6 +93,11 @@ import {
 import { prefetchProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { shouldShowWorkspaceSetup, useWorkspaceSetupStore } from "@/stores/workspace-setup-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
+import { useHostFeature } from "@/runtime/host-features";
+import {
+  useWorkspaceReadController,
+  type WorkspaceReadAction,
+} from "@/hooks/use-workspace-read-controller";
 import { useWorkspaceTerminalSessionRetention } from "@/terminal/hooks/use-workspace-terminal-session-retention";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -929,6 +934,8 @@ interface WorkspaceHeaderTitleBarProps {
   createTerminalDisabled: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
+  workspaceReadAction: WorkspaceReadAction;
+  workspaceReadActionPending: boolean;
   onCreateDraftTab: () => void;
   onCreateTerminal: () => void;
   onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
@@ -936,6 +943,7 @@ interface WorkspaceHeaderTitleBarProps {
   onOpenImportSheet: () => void;
   onCopyWorkspacePath: () => void;
   onCopyBranchName: () => void;
+  onWorkspaceReadAction: () => void;
   onOpenSetupTab: () => void;
   onScriptTerminalStarted: (terminalId: string) => void;
   onViewScriptTerminal: (terminalId: string) => void;
@@ -958,6 +966,8 @@ function WorkspaceHeaderTitleBar({
   createTerminalDisabled,
   importAgentDisabled,
   copyPathDisabled,
+  workspaceReadAction,
+  workspaceReadActionPending,
   onCreateDraftTab,
   onCreateTerminal,
   onCreateTerminalWithProfile,
@@ -965,6 +975,7 @@ function WorkspaceHeaderTitleBar({
   onOpenImportSheet,
   onCopyWorkspacePath,
   onCopyBranchName,
+  onWorkspaceReadAction,
   onOpenSetupTab,
   onScriptTerminalStarted,
   onViewScriptTerminal,
@@ -996,6 +1007,8 @@ function WorkspaceHeaderTitleBar({
             createTerminalDisabled={createTerminalDisabled}
             importAgentDisabled={importAgentDisabled}
             copyPathDisabled={copyPathDisabled}
+            workspaceReadAction={workspaceReadAction}
+            workspaceReadActionPending={workspaceReadActionPending}
             onCreateDraftTab={onCreateDraftTab}
             onCreateTerminal={onCreateTerminal}
             onCreateTerminalWithProfile={onCreateTerminalWithProfile}
@@ -1003,6 +1016,7 @@ function WorkspaceHeaderTitleBar({
             onOpenImportSheet={onOpenImportSheet}
             onCopyWorkspacePath={onCopyWorkspacePath}
             onCopyBranchName={onCopyBranchName}
+            onWorkspaceReadAction={onWorkspaceReadAction}
             onOpenSetupTab={onOpenSetupTab}
           />
         ) : (
@@ -1011,9 +1025,12 @@ function WorkspaceHeaderTitleBar({
             showWorkspaceSetup={showWorkspaceSetup}
             importAgentDisabled={importAgentDisabled}
             copyPathDisabled={copyPathDisabled}
+            workspaceReadAction={workspaceReadAction}
+            workspaceReadActionPending={workspaceReadActionPending}
             onOpenImportSheet={onOpenImportSheet}
             onCopyWorkspacePath={onCopyWorkspacePath}
             onCopyBranchName={onCopyBranchName}
+            onWorkspaceReadAction={onWorkspaceReadAction}
             onOpenSetupTab={onOpenSetupTab}
           />
         )}
@@ -1419,6 +1436,39 @@ function useWorkspaceTerminalTabActions({
   };
 }
 
+function useWorkspaceHeaderReadAction({
+  serverId,
+  workspaceId,
+  workspace,
+}: {
+  serverId: string;
+  workspaceId: string;
+  workspace: WorkspaceDescriptor | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  // COMPAT(workspaceMarkUnread): added in v0.5.0, remove gate after 2027-02-19.
+  const supportsMarkUnread = useHostFeature(serverId, "workspaceMarkUnread");
+  const controller = useWorkspaceReadController({
+    serverId,
+    workspaceId,
+    status: workspace?.status,
+    markedUnreadAt: workspace?.markedUnreadAt,
+    supportsMarkUnread,
+  });
+  const onSelect = useCallback(() => {
+    void controller.performAction().catch((error) => {
+      const fallbackKey =
+        controller.action === "mark_unread"
+          ? "sidebar.workspace.toasts.markUnreadFailed"
+          : "sidebar.workspace.toasts.markAsReadFailed";
+      toast.error(error instanceof Error ? error.message : t(fallbackKey));
+    });
+  }, [controller, t, toast]);
+
+  return { action: controller.action, pending: controller.pending, onSelect };
+}
+
 function WorkspaceScreenContent({
   serverId,
   workspaceId,
@@ -1440,6 +1490,11 @@ function WorkspaceScreenContent({
     [workspaceId],
   );
   const workspaceDescriptor = useWorkspace(normalizedServerId, normalizedWorkspaceId);
+  const workspaceReadController = useWorkspaceHeaderReadAction({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    workspace: workspaceDescriptor,
+  });
   const workspaceScripts = getWorkspaceScripts(workspaceDescriptor);
   const { handleRetryHost, handleManageHost, handleDismissMissingWorkspace } =
     useWorkspaceRouteActions(normalizedServerId);
@@ -3557,6 +3612,8 @@ function WorkspaceScreenContent({
                 createTerminalDisabled={createTerminalDisabled}
                 importAgentDisabled={!canOpenImportSheet}
                 copyPathDisabled={!workspaceDirectory}
+                workspaceReadAction={workspaceReadController.action}
+                workspaceReadActionPending={workspaceReadController.pending}
                 onCreateDraftTab={handleCreateDraftTab}
                 onCreateTerminal={handleCreateTerminal}
                 onCreateTerminalWithProfile={handleCreateTerminalWithProfile}
@@ -3564,6 +3621,7 @@ function WorkspaceScreenContent({
                 onOpenImportSheet={openImportSheet}
                 onCopyWorkspacePath={handleCopyWorkspacePath}
                 onCopyBranchName={handleCopyBranchName}
+                onWorkspaceReadAction={workspaceReadController.onSelect}
                 onOpenSetupTab={handleOpenSetupTab}
                 onScriptTerminalStarted={handleScriptTerminalStarted}
                 onViewScriptTerminal={handleViewScriptTerminal}

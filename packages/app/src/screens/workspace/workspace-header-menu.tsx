@@ -3,6 +3,8 @@ import { View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import {
+  CircleCheck,
+  CircleDot,
   Copy,
   Ellipsis,
   Globe,
@@ -29,8 +31,11 @@ import {
 } from "@getpaseo/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { Theme } from "@/styles/theme";
+import type { WorkspaceReadAction } from "@/hooks/use-workspace-read-controller";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedCircleCheck = withUnistyles(CircleCheck);
+const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedSquarePen = withUnistyles(SquarePen);
 const ThemedGlobe = withUnistyles(Globe);
@@ -46,6 +51,8 @@ const MENU_NEW_TERMINAL_ICON = <TerminalProfileIcon iconKey={undefined} size={16
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
+const MENU_MARK_AS_READ_ICON = <ThemedCircleCheck size={16} uniProps={mutedColorMapping} />;
+const MENU_MARK_UNREAD_ICON = <ThemedCircleDot size={16} uniProps={mutedColorMapping} />;
 
 /**
  * The compact header buttons draw at 32pt, under the 44pt touch minimum, and sit flush against
@@ -63,9 +70,12 @@ export interface WorkspaceHeaderWorkspaceActions {
   showWorkspaceSetup: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
+  workspaceReadAction: WorkspaceReadAction;
+  workspaceReadActionPending: boolean;
   onOpenImportSheet: () => void;
   onCopyWorkspacePath: () => void;
   onCopyBranchName: () => void;
+  onWorkspaceReadAction: () => void;
   onOpenSetupTab: () => void;
 }
 
@@ -74,9 +84,12 @@ function WorkspaceHeaderWorkspaceActionItems({
   showWorkspaceSetup,
   importAgentDisabled,
   copyPathDisabled,
+  workspaceReadAction,
+  workspaceReadActionPending,
   onOpenImportSheet,
   onCopyWorkspacePath,
   onCopyBranchName,
+  onWorkspaceReadAction,
   onOpenSetupTab,
 }: WorkspaceHeaderWorkspaceActions) {
   const { t } = useTranslation();
@@ -107,6 +120,26 @@ function WorkspaceHeaderWorkspaceActionItems({
       >
         {t("workspace.header.actions.importSession")}
       </DropdownMenuItem>
+      {workspaceReadAction ? (
+        <DropdownMenuItem
+          testID={
+            workspaceReadAction === "mark_as_read"
+              ? "workspace-header-mark-as-read"
+              : "workspace-header-mark-unread"
+          }
+          leading={
+            workspaceReadAction === "mark_as_read" ? MENU_MARK_AS_READ_ICON : MENU_MARK_UNREAD_ICON
+          }
+          disabled={workspaceReadActionPending}
+          onSelect={onWorkspaceReadAction}
+        >
+          {t(
+            workspaceReadAction === "mark_as_read"
+              ? "sidebar.workspace.actions.markAsRead"
+              : "sidebar.workspace.actions.markUnread",
+          )}
+        </DropdownMenuItem>
+      ) : null}
       {showWorkspaceSetup ? (
         <>
           <DropdownMenuSeparator />
