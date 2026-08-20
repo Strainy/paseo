@@ -9,6 +9,7 @@ import {
 } from "@getpaseo/client/internal/daemon-client";
 import {
   connectionFromListen,
+  createRemoteSshHostConnection,
   normalizeStoredHostProfile,
   upsertHostConnectionInProfiles,
   registryHasConnection,
@@ -38,8 +39,8 @@ import {
   type ConnectionProbeState,
 } from "@/utils/connection-selection";
 import {
-  buildLocalDaemonTransportUrl,
-  createDesktopLocalDaemonTransportFactory,
+  buildDesktopDaemonTransportUrl,
+  createDesktopDaemonTransportFactory,
 } from "@/desktop/daemon/desktop-daemon-transport";
 import { getDesktopHost } from "@/desktop/host";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
@@ -73,6 +74,7 @@ export type ActiveConnection =
   | { type: "directTcp"; endpoint: string; display: string }
   | { type: "directSocket"; endpoint: string; display: "socket" }
   | { type: "directPipe"; endpoint: string; display: "pipe" }
+  | { type: "remoteSsh"; endpoint: string; display: string }
   | { type: "relay"; endpoint: string; display: "relay" };
 
 export type HostRuntimeAgentDirectoryStatus =
@@ -202,6 +204,13 @@ function toActiveConnection(connection: HostConnection): ActiveConnection {
       type: "directPipe",
       endpoint: connection.path,
       display: "pipe",
+    };
+  }
+  if (connection.type === "remoteSsh") {
+    return {
+      type: "remoteSsh",
+      endpoint: connection.host,
+      display: connection.host,
     };
   }
   if (connection.type === "directTcp") {
@@ -485,7 +494,7 @@ function createDefaultDeps(): HostRuntimeControllerDeps {
 
   return {
     createClient: ({ host, connection, clientId, runtimeGeneration }) => {
-      const localTransportFactory = createDesktopLocalDaemonTransportFactory();
+      const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
         suppressSendErrors: true,
@@ -499,10 +508,25 @@ function createDefaultDeps(): HostRuntimeControllerDeps {
       if (connection.type === "directSocket" || connection.type === "directPipe") {
         return new DaemonClient({
           ...base,
-          ...(localTransportFactory ? { transportFactory: localTransportFactory } : {}),
-          url: buildLocalDaemonTransportUrl({
+          ...(desktopTransportFactory ? { transportFactory: desktopTransportFactory } : {}),
+          url: buildDesktopDaemonTransportUrl({
             transportType: connection.type === "directSocket" ? "socket" : "pipe",
             transportPath: connection.path,
+          }),
+        });
+      }
+      if (connection.type === "remoteSsh") {
+        if (!desktopTransportFactory) {
+          throw new Error("Remote SSH is only available in the desktop app.");
+        }
+        return new DaemonClient({
+          ...base,
+          transportFactory: desktopTransportFactory,
+          url: buildDesktopDaemonTransportUrl({
+            transportType: "ssh",
+            host: connection.host,
+            ...(connection.sshPort !== undefined ? { sshPort: connection.sshPort } : {}),
+            ...(connection.identityFile ? { identityFile: connection.identityFile } : {}),
           }),
         });
       }
@@ -1738,6 +1762,18 @@ export class HostRuntimeStore {
     });
   }
 
+  async probeAndUpsertRemoteSshConnection(input: {
+    host: string;
+    sshPort?: number;
+    identityFile?: string;
+    label?: string;
+  }): Promise<{ profile: HostProfile; serverId: string; hostname: string | null }> {
+    return this.probeAndUpsertConnection({
+      label: input.label,
+      connection: createRemoteSshHostConnection(input),
+    });
+  }
+
   async upsertRelayConnection(input: {
     serverId: string;
     relayEndpoint: string;
@@ -2484,6 +2520,12 @@ export interface HostMutations {
     password?: string;
     label?: string;
   }) => Promise<{ profile: HostProfile; serverId: string; hostname: string | null }>;
+  probeAndUpsertRemoteSshConnection: (input: {
+    host: string;
+    sshPort?: number;
+    identityFile?: string;
+    label?: string;
+  }) => Promise<{ profile: HostProfile; serverId: string; hostname: string | null }>;
   upsertRelayConnection: (input: {
     serverId: string;
     relayEndpoint: string;
@@ -2509,6 +2551,7 @@ export function useHostMutations(): HostMutations {
     () => ({
       upsertDirectConnection: (input) => store.upsertDirectConnection(input),
       probeAndUpsertDirectConnection: (input) => store.probeAndUpsertDirectConnection(input),
+      probeAndUpsertRemoteSshConnection: (input) => store.probeAndUpsertRemoteSshConnection(input),
       upsertRelayConnection: (input) => store.upsertRelayConnection(input),
       upsertConnectionFromOffer: (offer, label) => store.upsertConnectionFromOffer(offer, label),
       upsertConnectionFromOfferUrl: (url, label) => store.upsertConnectionFromOfferUrl(url, label),
