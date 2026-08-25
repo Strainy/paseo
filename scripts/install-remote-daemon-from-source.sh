@@ -108,7 +108,7 @@ workspaces=(
   @getpaseo/relay
   @getpaseo/protocol
   @getpaseo/client
-  @paseo/plugin
+  @getpaseo/plugin
   @getpaseo/server
   @getpaseo/cli
 )
