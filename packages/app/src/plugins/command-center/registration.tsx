@@ -54,7 +54,7 @@ export function PluginCommandCenterActions() {
     return buildPluginCommandCenterContributions({
       plugins,
       runtime(pluginId) {
-        const runtime = createPluginSurfaceRuntime(client, pluginId);
+        const runtime = createPluginSurfaceRuntime(client, pluginId, serverId);
         if (!runtime) throw new Error("Plugin host is offline");
         return runtime;
       },

@@ -1,4 +1,5 @@
 import { callPluginRpc } from "@getpaseo/plugin/client/host";
+import type { PluginNavigation as PluginSdkNavigation } from "@getpaseo/plugin";
 import type {
   PluginAgentCommandContext,
   PluginCommandCapabilities,
@@ -10,7 +11,7 @@ import { resolvePluginPanelOpenLocation } from "./workspace-panels/locations";
 import type { PluginSurfaceRuntime } from "./surface-runtime";
 import type { InstalledPlugin } from "./types";
 
-export interface PluginNavigation {
+export interface PluginNavigation extends PluginSdkNavigation {
   openSettings(pluginId: string, screenId: string): void;
   openSurface(pluginId: string, surfaceId: string): void;
   openWorkspacePanel(pluginId: string, panelId: string, location: PluginPanelLocation): void;
@@ -40,6 +41,12 @@ export function createPluginCapabilities(
         throw new Error(`Plugin surface is unavailable: ${surfaceId}`);
       }
       navigation.openSurface(plugin.id, surfaceId);
+    },
+    openWorkspace(workspaceId, options) {
+      navigation.openWorkspace(workspaceId, options);
+    },
+    openExternal(url) {
+      return navigation.openExternal(url);
     },
   };
 }

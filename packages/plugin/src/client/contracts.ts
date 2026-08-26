@@ -16,6 +16,7 @@ import type {
   PluginAttachmentSourceContribution,
   PluginTimelineTransformResult,
   PluginCleanup,
+  PluginOpenWorkspaceOptions,
 } from "../contracts.js";
 
 export interface PluginHostProps {
@@ -167,6 +168,8 @@ export interface PluginCommandCapabilities {
   ): Promise<ZodOutput<OutputSchema>>;
   openSurface(id: string): void;
   openSettings(id: string): void;
+  openWorkspace(workspaceId: string, options?: PluginOpenWorkspaceOptions): void;
+  openExternal(url: string): Promise<void>;
 }
 
 export interface PluginGlobalCommandContext extends PluginCommandCapabilities {

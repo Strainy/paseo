@@ -128,6 +128,7 @@ function createRuntime(pluginId: string) {
   });
   return {
     paseo: createPaseoApi(client),
+    navigation: { openWorkspace() {}, openExternal: async () => undefined },
     invoke: async (method: string, input: unknown) => {
       expect(pluginId).toBe("review");
       expect(method).toBe("review.inspect");
@@ -146,6 +147,8 @@ describe("plugin Command Center contributions", () => {
       navigation: {
         openSettings() {},
         openSurface() {},
+        openWorkspace() {},
+        openExternal: async () => undefined,
         openWorkspacePanel() {},
         openAgentPanel() {},
       },
@@ -185,6 +188,7 @@ describe("plugin Command Center contributions", () => {
       receivedPaseo = context.paseo;
       rpcValue = (await context.rpc(inspect, { value: 4 })).value;
       context.openSurface("main");
+      context.openWorkspace("workspace-9", { agentId: "agent-9" });
       context.openPanel("details", { location: "explorer" });
     });
     const runtime = createRuntime("review");
@@ -198,6 +202,12 @@ describe("plugin Command Center contributions", () => {
         openSettings() {},
         openSurface(pluginId, surfaceId) {
           opened.push(`${pluginId}/surface/${surfaceId}`);
+        },
+        openWorkspace(workspaceId, options) {
+          opened.push(`workspace/${workspaceId}/${options?.agentId ?? ""}`);
+        },
+        async openExternal(url) {
+          opened.push(`external/${url}`);
         },
         openWorkspacePanel(pluginId, panelId, location) {
           opened.push(`${pluginId}/workspace/${panelId}/${location}`);
@@ -215,7 +225,11 @@ describe("plugin Command Center contributions", () => {
 
     expect(rpcValue).toBe(5);
     expect(receivedPaseo).toBe(runtime.paseo);
-    expect(opened).toEqual(["review/surface/main", "review/agent/details/agent-1/explorer"]);
+    expect(opened).toEqual([
+      "review/surface/main",
+      "workspace/workspace-9/agent-9",
+      "review/agent/details/agent-1/explorer",
+    ]);
   });
 
   it("removes every contribution when its installation disappears", () => {
@@ -229,6 +243,8 @@ describe("plugin Command Center contributions", () => {
         navigation: {
           openSettings() {},
           openSurface() {},
+          openWorkspace() {},
+          openExternal: async () => undefined,
           openWorkspacePanel() {},
           openAgentPanel() {},
         },
