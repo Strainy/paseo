@@ -161,7 +161,10 @@ export function PluginSurfaceScreen() {
   const installations = usePluginInstallations(pluginId);
   const hosts = useHosts();
   const client = useHostRuntimeClient(serverId);
-  const runtime = useMemo(() => createPluginSurfaceRuntime(client, pluginId), [client, pluginId]);
+  const runtime = useMemo(
+    () => createPluginSurfaceRuntime(client, pluginId, serverId),
+    [client, pluginId, serverId],
+  );
   const compact = useIsCompactFormFactor();
   const { sidebarItem, surface } = useMemo(
     () => resolvePluginSurfaceContribution(plugin, identity),

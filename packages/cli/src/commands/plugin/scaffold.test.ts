@@ -84,8 +84,11 @@ import {
   type PluginClientContext,
   type PluginComposerPillProps,
   type PluginSurfaceProps,
+  useOpenWorkspace,
   useAgent,
   usePaseo,
+  usePaseoHost,
+  useProjects,
   useWorkspace,
 } from "@getpaseo/plugin";
 import { inspect } from "./inspect.shared";
@@ -93,12 +96,28 @@ import { inspect } from "./inspect.shared";
 export function Surface({ navigation }: PluginSurfaceProps) {
   const paseo = usePaseo();
   const toast = useToast();
+  const project = useProjects()[0];
+  const placement = project?.placements[0] ?? null;
+  const projectHost = usePaseoHost(placement?.serverId ?? null);
+  const openWorkspace = useOpenWorkspace();
   const createWorkspace = () => paseo.workspaces.create({
     source: { kind: "directory", path: "/repo" },
   });
+  const createProjectWorkspace = async () => {
+    if (!placement || !projectHost) return;
+    const workspace = await projectHost.workspaces.create({
+      source: {
+        kind: "directory",
+        path: placement.projectRootPath,
+        projectId: placement.projectId,
+      },
+    });
+    openWorkspace(workspace.id, { serverId: placement.serverId });
+  };
   navigation?.openAgent({ agentId: "agent-1" });
   navigation?.openWorkspace({ workspaceId: "workspace-1" });
   void createWorkspace;
+  void createProjectWorkspace;
   return <><Icon name="Settings" size={18} color="#123456" /><Text onPress={() => toast.show("Ready")}>Paseo API</Text><Modal title="Example" icon={<Icon name="Settings" />} open={false} onOpenChange={() => {}}><Modal.Content><Text>Modal</Text></Modal.Content></Modal></>;
 }
 

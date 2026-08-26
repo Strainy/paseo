@@ -48,6 +48,23 @@ export interface PluginIconProps {
   color?: string;
 }
 
+export interface PluginProjectPlacementSnapshot {
+  readonly serverId: string;
+  readonly serverName: string;
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly projectRootPath: string;
+  readonly projectKind: "git" | "non_git" | "directory";
+  readonly isOnline: boolean;
+}
+
+export interface PluginProjectSnapshot {
+  /** Cross-host identity shared by placements of the same project. */
+  readonly projectKey: string;
+  readonly projectName: string;
+  readonly placements: readonly PluginProjectPlacementSnapshot[];
+}
+
 export interface PluginWorkspaceSnapshot {
   readonly id: string;
   readonly projectId: string;
@@ -87,6 +104,29 @@ export type PluginPanelLocation = "workspace" | "explorer";
 
 export interface PluginOpenPanelOptions {
   location?: PluginPanelLocation;
+}
+
+export interface PluginOpenWorkspaceOptions {
+  /** Focus this agent inside the workspace instead of its default tab. */
+  agentId?: string;
+  /** Pin the opened tab. Defaults to true when `agentId` is set. */
+  pin?: boolean;
+  /** Navigate on this host instead of the plugin installation's selected host. */
+  serverId?: string;
+}
+
+/**
+ * In-app navigation the host performs on a plugin's behalf. Plugins never get
+ * router access; this is the whole navigation surface.
+ */
+export interface PluginNavigation {
+  openWorkspace(workspaceId: string, options?: PluginOpenWorkspaceOptions): void;
+  /**
+   * Hands an http(s) URL to the OS browser. Plugin code cannot do this itself:
+   * `Linking.openURL` reaches `window.open`, which Paseo's desktop shell turns
+   * into an in-app browser tab rather than leaving the app.
+   */
+  openExternal(url: string): Promise<void>;
 }
 
 interface PluginWorkspacePanelBase {
@@ -240,6 +280,8 @@ export interface PluginCommandCapabilities {
     input: ZodInput<InputSchema>,
   ): Promise<ZodOutput<OutputSchema>>;
   openSurface(id: string): void;
+  openWorkspace(workspaceId: string, options?: PluginOpenWorkspaceOptions): void;
+  openExternal(url: string): Promise<void>;
 }
 
 export interface PluginGlobalCommandContext extends PluginCommandCapabilities {

@@ -5,23 +5,22 @@ import * as ReactNative from "react-native";
 // eslint-disable-next-line no-restricted-imports -- plugin bundles receive TanStack's real runtime, not Paseo's query wrappers.
 import * as ReactQuery from "@tanstack/react-query";
 import * as Zod from "zod";
-import {
-  defineAttachmentSource,
-  defineRpc,
-  type PluginAttachmentSourceContribution,
-  type PluginCommandCenterItemContribution,
-  type PluginClientContribution,
-  type PluginSidebarContribution,
-  type PluginSurfaceProps,
-  type PluginThemeContribution,
-  type PluginTimelineRendererContribution,
-  type PluginTimelineTransformerContribution,
-  type PluginWorkspacePanelContribution,
-  usePaseo,
-  useAgent,
-  useWorkspace,
-  useRpc,
+import type {
+  PluginAttachmentSourceContribution,
+  PluginCommandCenterItemContribution,
+  PluginClientContribution,
+  PluginSidebarContribution,
+  PluginSurfaceProps,
+  PluginThemeContribution,
+  PluginTimelineRendererContribution,
+  PluginTimelineTransformerContribution,
+  PluginWorkspacePanelContribution,
 } from "@getpaseo/plugin";
+// Namespaces, not named imports: the runtime shim below hands these straight to
+// plugin code, so it cannot drift behind the SDK's exports the way a
+// hand-written list does.
+import * as PluginSdk from "@getpaseo/plugin";
+import * as PluginServerSdk from "@getpaseo/plugin/server";
 import { createPluginContext, type PluginRegistrationCollector } from "@getpaseo/plugin/host";
 import type { EvaluatedPlugin } from "./types";
 import type { ComponentType } from "react";
@@ -253,23 +252,12 @@ export function evaluatePluginClientBundle(id: string, bundle: string): Evaluate
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJsxRuntime;
     if (name === "react-native") return ReactNative;
-    if (name === "@getpaseo/plugin") {
-      return {
-        defineAttachmentSource,
-        defineRpc,
-        Icon,
-        usePaseo,
-        useAgent,
-        useWorkspace,
-        useRpc,
-      };
-    }
+    // Icon is ambient in the SDK (declare const) — the host owns the implementation.
+    if (name === "@getpaseo/plugin") return { ...PluginSdk, Icon };
     if (name === "@getpaseo/plugin/react-native" || name === "@paseo/plugin/react-native") {
       return pluginReactNativeRuntime;
     }
-    if (name === "@getpaseo/plugin/server") {
-      return { defineAttachmentSource, defineRpc };
-    }
+    if (name === "@getpaseo/plugin/server") return PluginServerSdk;
     if (name === "@tanstack/react-query") return ReactQuery;
     if (name === "zod") return Zod;
     throw new Error(`Module "${name}" is not available in plugin client code`);

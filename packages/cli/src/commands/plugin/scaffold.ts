@@ -157,6 +157,22 @@ declare module "@getpaseo/plugin" {
     color?: string;
   }
 
+  export interface PluginProjectPlacementSnapshot {
+    readonly serverId: string;
+    readonly serverName: string;
+    readonly projectId: string;
+    readonly projectName: string;
+    readonly projectRootPath: string;
+    readonly projectKind: "git" | "non_git" | "directory";
+    readonly isOnline: boolean;
+  }
+
+  export interface PluginProjectSnapshot {
+    readonly projectKey: string;
+    readonly projectName: string;
+    readonly placements: readonly PluginProjectPlacementSnapshot[];
+  }
+
   export interface PluginWorkspaceSnapshot {
     readonly id: string;
     readonly projectId: string;
@@ -224,6 +240,17 @@ declare module "@getpaseo/plugin" {
     agentId?: string;
   }
 
+  export interface PluginOpenWorkspaceOptions {
+    agentId?: string;
+    pin?: boolean;
+    serverId?: string;
+  }
+
+  export interface PluginNavigation {
+    openWorkspace(workspaceId: string, options?: PluginOpenWorkspaceOptions): void;
+    openExternal(url: string): Promise<void>;
+  }
+
   export type PluginWorkspacePanelContribution =
     | { id: string; title: string; icon: string; locations?: readonly PluginPanelLocation[]; context: "workspace"; Component: ComponentType<PluginWorkspacePanelProps> }
     | { id: string; title: string; icon: string; locations?: readonly PluginPanelLocation[]; context: "agent"; Component: ComponentType<PluginAgentPanelProps> };
@@ -288,6 +315,8 @@ declare module "@getpaseo/plugin" {
       input: ZodInput<InputSchema>,
     ): Promise<ZodOutput<OutputSchema>>;
     openSurface(id: string): void;
+    openWorkspace(workspaceId: string, options?: PluginOpenWorkspaceOptions): void;
+    openExternal(url: string): Promise<void>;
   }
 
   export interface PluginGlobalCommandContext extends PluginCommandCapabilities {
@@ -348,6 +377,10 @@ declare module "@getpaseo/plugin" {
 
   export function usePaseo(): PaseoApi;
 
+  export function useProjects(): readonly PluginProjectSnapshot[];
+
+  export function usePaseoHost(serverId: string | null): PaseoApi | null;
+
   export function useWorkspace<Selection>(
     workspaceId: string,
     selector: (workspace: PluginWorkspaceSnapshot) => Selection,
@@ -357,6 +390,13 @@ declare module "@getpaseo/plugin" {
     agentId: string,
     selector: (agent: PluginAgentSnapshot) => Selection,
   ): Selection | null;
+
+  export function useOpenWorkspace(): (
+    workspaceId: string,
+    options?: PluginOpenWorkspaceOptions,
+  ) => void;
+
+  export function useOpenExternal(): (url: string) => Promise<void>;
 }
 `;
 

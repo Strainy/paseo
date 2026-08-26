@@ -20,6 +20,7 @@ export interface ProjectHostEntry {
   projectId: string;
   projectName: string;
   projectCustomName: string | null;
+  projectKind: ProjectDescriptor["projectKind"];
   serverName: string;
   isOnline: boolean;
   repoRoot: string;
@@ -87,6 +88,7 @@ interface HostGroup {
   projectId: string;
   projectName: string;
   projectCustomName: string | null;
+  projectKind: ProjectDescriptor["projectKind"];
   serverName: string;
   isOnline: boolean;
   workspaces: WorkspaceDescriptor[];
@@ -107,16 +109,33 @@ interface ProjectGroup {
 function findProjectMetadata(
   host: ProjectHost,
   projectId: string,
-): { customName: string | null; displayName: string } | null {
+): {
+  customName: string | null;
+  displayName: string;
+  projectKind: ProjectDescriptor["projectKind"];
+} | null {
   for (const project of host.projects) {
     if (project.projectId === projectId) {
       return {
         customName: project.projectCustomName ?? null,
         displayName: project.projectDisplayName,
+        projectKind: project.projectKind,
       };
     }
   }
   return null;
+}
+
+function resolveProjectKind(
+  host: ProjectHost,
+  projectId: string,
+  metadata: ReturnType<typeof findProjectMetadata>,
+): ProjectDescriptor["projectKind"] {
+  if (metadata) return metadata.projectKind;
+  return (
+    host.workspaces.find((workspace) => workspace.projectId === projectId)?.projectKind ??
+    "directory"
+  );
 }
 
 function buildHostProjectEntries(hosts: ProjectHost[]): HostProjectListItem[] {
@@ -174,6 +193,7 @@ function toHostEntry(group: HostGroup): ProjectHostEntry {
     projectId: group.projectId,
     projectName: group.projectName,
     projectCustomName: group.projectCustomName,
+    projectKind: group.projectKind,
     serverName: group.serverName,
     isOnline: group.isOnline,
     repoRoot,
@@ -243,6 +263,7 @@ function addHostProjects(
         projectId,
         projectName: customName?.displayName ?? hostProject.projectName,
         projectCustomName: customName?.customName ?? null,
+        projectKind: resolveProjectKind(host, projectId, customName),
         serverName: host.serverName,
         isOnline: host.isOnline,
         workspaces: [],

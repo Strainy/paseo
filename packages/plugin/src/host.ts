@@ -17,8 +17,10 @@ import type {
   PluginTimelineTransformerContribution,
   PluginWorkspacePanelContribution,
 } from "./contracts.js";
+import { PluginNavigationProvider } from "./navigation-context.js";
 import { PluginRpcProvider } from "./rpc-context.js";
 import { PaseoApiProvider } from "./paseo-context.js";
+import { PluginProjectProvider } from "./project-context.js";
 import { callPluginRpc } from "./rpc.js";
 import type { ComponentType } from "react";
 
@@ -100,4 +102,10 @@ export async function searchPluginAttachments(
   return PluginAttachmentSearchPayloadSchema.parseAsync(output);
 }
 
-export { callPluginRpc, PaseoApiProvider, PluginRpcProvider };
+export {
+  callPluginRpc,
+  PaseoApiProvider,
+  PluginProjectProvider,
+  PluginNavigationProvider,
+  PluginRpcProvider,
+};

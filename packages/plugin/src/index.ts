@@ -30,9 +30,13 @@ export type {
   PluginGlobalCommandContext,
   PluginHandlerContext,
   PluginHostProps,
+  PluginNavigation,
   PluginOpenPanelOptions,
   PluginIconProps,
+  PluginOpenWorkspaceOptions,
   PluginPanelLocation,
+  PluginProjectPlacementSnapshot,
+  PluginProjectSnapshot,
   PluginTheme,
   PluginSidebarContribution,
   PluginSurfaceContribution,
@@ -51,5 +55,7 @@ export type {
   PluginWorkspaceSnapshot,
 } from "./contracts.js";
 export { usePaseo } from "./paseo-context.js";
+export { usePaseoHost, useProjects } from "./project-context.js";
 export { useAgent, useWorkspace } from "./client-state.js";
 export { useRpc } from "./rpc-context.js";
+export { useOpenExternal, useOpenWorkspace } from "./navigation-context.js";

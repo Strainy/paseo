@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import * as PluginSdk from "@getpaseo/plugin";
+import * as PluginServerSdk from "@getpaseo/plugin/server";
 import { evaluatePluginClientBundle } from "./evaluate";
 
 function bundle(body: string): string {
@@ -8,6 +10,54 @@ function bundle(body: string): string {
     return module.exports;
   })`;
 }
+
+/** Bundle that captures what the runtime shim hands back for a specifier. */
+function requiringBundle(specifier: string): string {
+  return `(function(require) {
+    const module = { exports: {} };
+    const sdk = require(${JSON.stringify(specifier)});
+    module.exports.default = function(plugin) {
+      plugin.addSurface("main", function() { return null; });
+      globalThis.__pluginSdkUnderTest = sdk;
+      return function() {};
+    };
+    return module.exports;
+  })`;
+}
+
+describe("plugin client runtime modules", () => {
+  // The shim is what plugin code actually imports. When it is a hand-written
+  // list it drifts behind the SDK and every new export fails at call time with
+  // "is not a function" — these assert the whole surface reaches plugin code.
+  it("hands plugin code every @getpaseo/plugin export", () => {
+    evaluatePluginClientBundle("example", requiringBundle("@getpaseo/plugin"));
+    const sdk = (globalThis as { __pluginSdkUnderTest?: Record<string, unknown> })
+      .__pluginSdkUnderTest;
+
+    // Icon is ambient in the SDK (`declare const`) so it is not a runtime key of
+    // PluginSdk — the host owns the implementation and injects it here.
+    expect(Object.keys(sdk ?? {}).sort()).toEqual([...Object.keys(PluginSdk), "Icon"].sort());
+    for (const hook of ["usePaseo", "useRpc", "useWorkspace", "useAgent", "useOpenWorkspace"]) {
+      expect(typeof sdk?.[hook]).toBe("function");
+    }
+    expect(typeof sdk?.Icon).toBe("function");
+  });
+
+  it("hands plugin code every @getpaseo/plugin/server export", () => {
+    evaluatePluginClientBundle("example", requiringBundle("@getpaseo/plugin/server"));
+    const sdk = (globalThis as { __pluginSdkUnderTest?: Record<string, unknown> })
+      .__pluginSdkUnderTest;
+
+    expect(Object.keys(sdk ?? {}).sort()).toEqual(Object.keys(PluginServerSdk).sort());
+    expect(typeof sdk?.defineRpc).toBe("function");
+  });
+
+  it("refuses a module plugin code has no business importing", () => {
+    expect(() => evaluatePluginClientBundle("example", requiringBundle("node:fs"))).toThrow(
+      /not available in plugin client code/,
+    );
+  });
+});
 
 describe("evaluatePluginClientBundle", () => {
   it("collects timeline transformers and renderers", () => {

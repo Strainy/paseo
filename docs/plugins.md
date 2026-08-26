@@ -176,6 +176,11 @@ selected host's existing connection; switching the screen's host changes both `u
 installation. A server handler owns an IPC-backed daemon session for the life of its subprocess.
 Use plugin RPC for plugin-specific backend behavior that is not a normal Paseo operation.
 
+Client surfaces and panels can read the cross-host project catalog with `useProjects()`. A project
+contains one placement per host. Pass a placement's `serverId` to `usePaseoHost()` when an action
+must run on that host; it returns `null` while the host is offline. This is explicit host selection,
+not fallback from the plugin installation selected in the header.
+
 Each subprocess gets an exclusively owned `plugin:<id>` session. That identity is reserved from
 normal clients, never resumes another session, and is cleaned immediately on exit without reconnect
 grace. During daemon startup, plugin sessions may connect while application WebSockets remain
@@ -184,7 +189,8 @@ catalog is complete.
 
 When the same plugin contribution exists on multiple hosts, Paseo shows it once in the sidebar and
 adds a host picker to the screen header. The selected host supplies the bundle, RPC transport, and
-query cache. Plugin code cannot address another host.
+query cache. `usePaseo()` and `useRpc()` remain bound to it; only project-placement actions opt into
+another host through `usePaseoHost()`.
 
 Workspace panels and Command Center items remain client contributions. The daemon transports their
 compiled bundle without interpreting placement or callbacks. Panel props contain workspace and agent
@@ -248,6 +254,22 @@ matching workspace and agent track bar alongside Tasks and Subagents. Paseo owns
 shared chrome, pending state, error reporting, and placement. The component owns its icon and text;
 the callback is client code by construction. Removing the pill, reloading the plugin, disconnecting
 the host, or unloading the app tears down the contribution.
+They use typed plugin RPC only for plugin-specific backend work. Navigation is limited to the
+plugin's registered global surfaces, workspace panels, and `openWorkspace`; plugins do not receive
+Expo Router or workspace-layout store access.
+
+`openWorkspace(workspaceId, { agentId, serverId })` is the one route-free way a plugin moves the app. Surfaces
+and panels reach it through `useOpenWorkspace()`, Command Center callbacks through their context.
+The host resolves it against `navigateToAgent` when an agent is named and `navigateToWorkspace`
+otherwise, so tab preparation and pinning stay in app code. Omit `serverId` for the plugin
+installation's selected host; pass the server ID from a project placement after creating a workspace
+through `usePaseoHost()`.
+
+`openExternal(url)` is the other half: it leaves the app for the OS browser. Plugin code cannot do
+this itself, because `Linking.openURL` ends at `window.open` and the desktop shell resolves that to
+an in-app browser tab (`decideBrowserWindowOpenRequest`). The host routes it through
+`openExternalUrl` instead, and rejects non-http(s) URLs rather than dropping them the way that sink
+does.
 
 ## Contribute timeline items
 

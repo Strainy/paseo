@@ -228,6 +228,7 @@ function hostEntry(overrides: Partial<ProjectHostEntry> = {}): ProjectHostEntry 
     projectId: "project-a",
     projectName: "Project",
     projectCustomName: null,
+    projectKind: "git",
     serverName: "alpha",
     isOnline: true,
     repoRoot: "/home/me/proj",

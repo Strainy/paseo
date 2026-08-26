@@ -46,7 +46,10 @@ function PluginComposerPill({
   const client = useHostRuntimeClient(serverId);
   const toast = useToast();
   const [pending, setPending] = useState(false);
-  const runtime = useMemo(() => createPluginSurfaceRuntime(client, plugin.id), [client, plugin.id]);
+  const runtime = useMemo(
+    () => createPluginSurfaceRuntime(client, plugin.id, serverId),
+    [client, plugin.id, serverId],
+  );
   const state = useMemo(() => createPluginClientStateSource(serverId), [serverId]);
   const props = useMemo<PluginComposerPillProps>(
     () => ({

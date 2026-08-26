@@ -20,7 +20,7 @@ export function startPluginClientSide(
   daemonClient: DaemonClient,
 ): PluginCleanup {
   if (!installation.clientSide) return () => undefined;
-  const runtime = createPluginSurfaceRuntime(daemonClient, installation.id);
+  const runtime = createPluginSurfaceRuntime(daemonClient, installation.id, installation.serverId);
   if (!runtime) throw new Error("Plugin host is offline");
   const state = createPluginClientStateSource(installation.serverId);
   const capabilities = createPluginCapabilities(

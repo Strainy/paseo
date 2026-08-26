@@ -570,6 +570,8 @@ Every callback receives:
 | `paseo`                   | All                 | Selected host's existing `PaseoApi`.                                                                            |
 | `rpc(contract, input)`    | All                 | Typed call to this installation's daemon-side plugin handler.                                                   |
 | `openSurface(id)`         | All                 | Opens one of this plugin's registered global surfaces.                                                          |
+| `openWorkspace(id, opts)` | All                 | Navigates to a workspace. Pass `{ agentId }` to focus one of its agents and `{ serverId }` for another host.    |
+| `openExternal(url)`       | All                 | Opens an http(s) URL in the OS browser.                                                                         |
 | `workspace`               | Workspace and agent | Synchronous workspace snapshot.                                                                                 |
 | `agent`                   | Agent               | Synchronous matching agent snapshot.                                                                            |
 | `openPanel(id, options?)` | Workspace and agent | Opens a registered panel in the callback's current context. Pass `{ location: "explorer" }` to target Explorer. |
@@ -662,6 +664,48 @@ current values with `useWorkspace` and `useAgent`. The plugin owns when the pill
 and text, and the callback. `openPanel(id, { workspaceId, agentId? })` opens or focuses a panel
 registered by the same plugin.
 
+## Navigate to a workspace
+
+`openWorkspace` moves the app to a workspace without exposing Paseo's router. Surfaces and panels call it through `useOpenWorkspace()`; Command Center callbacks receive it on their context.
+
+```tsx
+import { usePaseo, useOpenWorkspace } from "@getpaseo/plugin";
+
+function ReviewButton({ repositoryPath, number }: { repositoryPath: string; number: number }) {
+  const paseo = usePaseo();
+  const openWorkspace = useOpenWorkspace();
+
+  async function review() {
+    const workspace = await paseo.workspaces.create({
+      title: `Review PR ${number}`,
+      source: {
+        kind: "worktree",
+        cwd: repositoryPath,
+        action: "checkout",
+        checkoutSource: { kind: "change_request", forge: "github", number },
+      },
+    });
+    const agent = await workspace.agents.create({
+      config: { provider: "claude" },
+      prompt: `Review PR #${number}.`,
+    });
+    openWorkspace(workspace.id, { agentId: agent.id });
+  }
+
+  return null;
+}
+```
+
+| Option     | Meaning                                                                          |
+| ---------- | -------------------------------------------------------------------------------- |
+| `agentId`  | Focus this agent's tab instead of the workspace's default tab.                   |
+| `pin`      | Pin the opened tab. Defaults to `true` when `agentId` is set, `false` otherwise. |
+| `serverId` | Navigate on this host instead of the plugin installation's selected host.        |
+
+Workspace IDs must belong to the selected host, or to the explicit `serverId` when one is passed. A blank ID throws rather than navigating somewhere arbitrary. This is the entire navigation surface — plugins get no router access, no history control, and no route strings.
+
+`useOpenExternal()` leaves the app entirely, handing an http(s) URL to the OS browser. Plugin code cannot do this itself: `Linking.openURL` reaches `window.open`, which the desktop shell turns into an in-app browser tab. Anything that is not `http:` or `https:` throws rather than being silently dropped.
+
 ## Use the Paseo SDK
 
 Use `usePaseo()` for ordinary Paseo operations from a surface. It borrows the selected host's existing connection; do not create another client.
@@ -698,6 +742,41 @@ function PullRequestAction() {
 ```
 
 The returned API covers projects, workspaces, agents, providers, and daemon config. See the [SDK API reference](/docs/sdk/reference) for its methods. Connection lifecycle methods are intentionally absent because Paseo owns the connection.
+
+### Work with projects across hosts
+
+`useProjects()` returns every known Paseo project grouped across hosts. Each placement carries its
+host, host-local project ID, root path, kind, and online state. Use `usePaseoHost(serverId)` to borrow
+that host's existing connection; it returns `null` when the host is offline.
+
+```tsx
+import { useOpenWorkspace, usePaseoHost, useProjects } from "@getpaseo/plugin";
+
+function CreateOnProject() {
+  const project = useProjects()[0];
+  const placement = project?.placements.find((candidate) => candidate.isOnline) ?? null;
+  const paseo = usePaseoHost(placement?.serverId ?? null);
+  const openWorkspace = useOpenWorkspace();
+
+  async function create() {
+    if (!placement || !paseo) return;
+    const workspace = await paseo.workspaces.create({
+      source: {
+        kind: "directory",
+        path: placement.projectRootPath,
+        projectId: placement.projectId,
+      },
+    });
+    openWorkspace(workspace.id, { serverId: placement.serverId });
+  }
+
+  return null;
+}
+```
+
+Project snapshots are deeply readonly and frozen. `usePaseo()` and plugin RPC stay bound to the
+installation selected in the plugin header; choosing a project placement is the explicit way to
+target another host.
 
 ## Add plugin-specific backend behavior
 
@@ -865,7 +944,7 @@ Paseo owns the composer menu, search picker, selected pill, draft state, and sub
 
 ## Hosts and lifecycle
 
-Plugins are installed per daemon. When the same contribution exists on several connected hosts, Paseo shows one sidebar item and adds a host picker. The selected host supplies the bundle, Paseo API, RPC transport, and query cache. Calls never fall through to another host when the selected host is offline.
+Plugins are installed per daemon. When the same contribution exists on several connected hosts, Paseo shows one sidebar item and adds a host picker. The selected host supplies the bundle, default Paseo API, RPC transport, and query cache. Calls never fall through to another host when the selected host is offline. Client surfaces and panels can explicitly target a placement from the cross-host project catalog.
 
 Attachment sources remain scoped to each composer's host.
 
