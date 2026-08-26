@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { PluginIconProps } from "./contracts.js";
 
+export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "./badges.js";
 export {
   PluginAttachmentItemSchema,
   PluginAttachmentSearchPayloadSchema,
@@ -38,6 +39,7 @@ export type {
   PluginProjectPlacementSnapshot,
   PluginProjectSnapshot,
   PluginTheme,
+  PluginSidebarBadgeContribution,
   PluginSidebarContribution,
   PluginSurfaceContribution,
   PluginSurfaceProps,

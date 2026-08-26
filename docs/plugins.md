@@ -157,10 +157,18 @@ export default function contribute(plugin: PluginContext) {
 ```
 
 The contribution function must return cleanup. Server cleanup may be async; Paseo waits for it when
-the plugin is reloaded, disabled, removed, disconnected, or shut down. Cleanup is for resources
+the plugin is reloaded, disabled, removed, disconnected, or shut down. Cleanup is where a plugin
+cancels work already in flight — an unattended `fetch` or child process keeps the subprocess alive
+for its own timeout, which stalls the reload that asked it to stop. A handler that resolves after the
+host closed the channel has its reply dropped rather than crashing the subprocess. Cleanup is for resources
 created by plugin code. Paseo removes registered contributions, unmounts surfaces, clears query
 state, rejects pending RPCs, closes the plugin's daemon session, and stops the subprocess. Cleanup
 errors are logged and do not interrupt host teardown.
+
+The app and the plugin subprocess each hand plugin code a module for the SDK specifiers. Both pass the
+imported namespace straight through — `evaluate.ts` for the client, `plugin-process.ts` for the
+server. Do not reduce either to a hand-written list of exports: it silently drops whatever the SDK
+gains next, and plugin code fails at call time with `X is not a function` rather than at load.
 
 Paseo owns the route, screen header, Lucide icon validation, close action, theme DTO, layout facts,
 and render error boundary. The contributed component owns the complete body below the header.
@@ -191,6 +199,15 @@ When the same plugin contribution exists on multiple hosts, Paseo shows it once 
 adds a host picker to the screen header. The selected host supplies the bundle, RPC transport, and
 query cache. `usePaseo()` and `useRpc()` remain bound to it; only project-placement actions opt into
 another host through `usePaseoHost()`.
+
+A sidebar item can carry a `badge` RPC that the host polls onto the row. This is the only plugin call
+that runs without a surface being open, because the sidebar row is mounted app-wide — the interval is
+floored in the SDK (`resolvePluginSidebarBadgeInterval`), not at the call site, so a plugin cannot ask
+the app to hammer its handler. It is deliberately not a general background-task hook: there is no
+plugin-to-app push channel, and the badge poll is not a substitute for one. A global surface receives
+`setSidebarBadgeCount(itemId, count)` so a local mutation can update its mounted badge immediately
+instead of waiting for the next poll. Check that the callback exists when the plugin also supports
+older hosts.
 
 Workspace panels and Command Center items remain client contributions. The daemon transports their
 compiled bundle without interpreting placement or callbacks. Panel props contain workspace and agent

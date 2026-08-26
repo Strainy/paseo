@@ -103,11 +103,16 @@ export function evaluatePluginClientBundle(id: string, bundle: string): Evaluate
       if (!contribution.icon.trim()) throw new Error(`Sidebar item ${normalizedId} has no icon`);
       resolvePluginIcon(contribution.icon.trim());
       sidebarItemIds.add(normalizedId);
+      const badge = contribution.badge;
+      if (badge && typeof badge.rpc?.name !== "string") {
+        throw new Error(`Sidebar item ${normalizedId} has an invalid badge RPC`);
+      }
       collector.sidebarItems.push({
         id: normalizedId,
         title: contribution.title.trim(),
         icon: contribution.icon.trim(),
         surface: requireId(contribution.surface, "sidebar surface id"),
+        ...(badge ? { badge } : {}),
       });
     },
     addWorkspacePanel(contribution: PluginWorkspacePanelContribution) {

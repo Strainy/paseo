@@ -40,7 +40,13 @@ interface PluginNavigableHostProps extends PluginHostProps {
   };
 }
 
-export interface PluginSurfaceProps extends PluginNavigableHostProps {}
+export interface PluginSurfaceProps extends PluginNavigableHostProps {
+  /**
+   * Updates a contributed sidebar item's visible badge without waiting for its
+   * next poll. Older hosts omit this callback.
+   */
+  setSidebarBadgeCount?(itemId: string, count: number): void;
+}
 
 export interface PluginIconProps {
   name: string;
@@ -188,11 +194,19 @@ export interface PluginSurfaceContribution {
   Component: ComponentType<PluginSurfaceProps>;
 }
 
+export interface PluginSidebarBadgeContribution {
+  /** RPC returning `{ count }`. Called with an empty input object. */
+  rpc: PluginRpcContract;
+  /** Poll interval. Defaults to 60s; the host floors it at 15s. */
+  intervalMs?: number;
+}
+
 export interface PluginSidebarContribution {
   id: string;
   title: string;
   icon: string;
   surface: string;
+  badge?: PluginSidebarBadgeContribution;
 }
 
 export interface PluginThemeColors {

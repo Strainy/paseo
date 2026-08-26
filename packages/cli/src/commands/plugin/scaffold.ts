@@ -54,6 +54,14 @@ const SDK_DECLARATIONS = `declare module "@getpaseo/plugin/server" {
 
   export const PluginAttachmentItemSchema: import("zod").ZodType<PluginAttachmentItem>;
   export const PluginAttachmentSearchPayloadSchema: import("zod").ZodType<PluginAttachmentSearchPayload>;
+
+  export interface PluginSidebarBadge { count: number; }
+  export const PluginSidebarBadgeSchema: import("zod").ZodType<PluginSidebarBadge>;
+
+  export interface PluginSidebarBadgeContribution {
+    rpc: PluginRpcContract;
+    intervalMs?: number;
+  }
 }
 
 declare module "@getpaseo/plugin/react-native" {
@@ -110,6 +118,7 @@ declare module "@getpaseo/plugin" {
   export {
     PluginAttachmentItemSchema,
     PluginAttachmentSearchPayloadSchema,
+    PluginSidebarBadgeSchema,
     defineAttachmentSource,
     defineRpc,
     type PluginAttachmentItem,
@@ -117,6 +126,8 @@ declare module "@getpaseo/plugin" {
     type PluginAttachmentSourceContribution,
     type PluginHandlerContext,
     type PluginRpcContract,
+    type PluginSidebarBadge,
+    type PluginSidebarBadgeContribution,
   } from "@getpaseo/plugin/server";
 
   export interface PluginTheme {
@@ -149,7 +160,9 @@ declare module "@getpaseo/plugin" {
     };
   }
 
-  export interface PluginSurfaceProps extends PluginNavigableHostProps {}
+  export interface PluginSurfaceProps extends PluginNavigableHostProps {
+    setSidebarBadgeCount?(itemId: string, count: number): void;
+  }
 
   export interface PluginIconProps {
     name: string;
@@ -260,6 +273,7 @@ declare module "@getpaseo/plugin" {
     title: string;
     icon: string;
     surface: string;
+    badge?: PluginSidebarBadgeContribution;
   }
 
   export interface PluginThemeColors {

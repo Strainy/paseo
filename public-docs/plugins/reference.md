@@ -159,14 +159,55 @@ export default function contribute(plugin: PluginContext) {
 }
 ```
 
+### Badge a sidebar item
+
+Add a `badge` to poll a count onto the sidebar row. The RPC takes an empty input and returns `{ count }`; `0` clears the badge.
+
+```ts
+import { PluginSidebarBadgeSchema, defineRpc } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+export const reviewBadge = defineRpc({
+  name: "reviews.badge",
+  input: z.object({}),
+  output: PluginSidebarBadgeSchema,
+});
+
+plugin.handle(reviewBadge, countOpenReviews);
+plugin.addSidebarItem({
+  id: "inbox",
+  title: "Reviews",
+  icon: "GitPullRequestArrow",
+  surface: "inbox",
+  badge: { rpc: reviewBadge, intervalMs: 120_000 },
+});
+```
+
+`intervalMs` defaults to 60s and is floored at 15s. Counts above 99 render as `99+`.
+
+The sidebar row is mounted app-wide, so this poll runs whether or not the plugin's surface is open — it is the one plugin call that happens without a surface. Keep the handler cheap, and do not use it as a general background task. A failing or offline poll shows no badge rather than a stale count.
+
+When a surface changes the state represented by its badge, update the visible count immediately:
+
+```tsx
+function Inbox({ setSidebarBadgeCount }: PluginSurfaceProps) {
+  useEffect(() => {
+    setSidebarBadgeCount?.("inbox", unreadCount);
+  }, [setSidebarBadgeCount, unreadCount]);
+}
+```
+
+The callback only updates the mounted app cache; keep the badge RPC authoritative for background polling and restarts. It is optional so the same plugin can still run on older Paseo hosts.
+
 `PluginSurfaceProps` contains:
 
-| Field        | Meaning                                                                                                                      |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `theme`      | Typed `PluginTheme` color tokens for the active Paseo theme.                                                                 |
-| `host`       | Selected host `id` and display `label`.                                                                                      |
-| `layout`     | `compact` and the `ios`, `android`, or `web` platform.                                                                       |
-| `navigation` | Optional client navigation. `openAgent({ agentId })` and `openWorkspace({ workspaceId })` open targets on the selected host. |
+| Field                   | Meaning                                                                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `theme`                 | Typed `PluginTheme` color tokens for the active Paseo theme.                                                                 |
+| `host`                  | Selected host `id` and display `label`.                                                                                      |
+| `layout`                | `compact` and the `ios`, `android`, or `web` platform.                                                                       |
+| `navigation`            | Optional client navigation. `openAgent({ agentId })` and `openWorkspace({ workspaceId })` open targets on the selected host. |
+| `setSidebarBadgeCount?` | Immediately updates one of this plugin's contributed sidebar badge counts.                                                   |
 
 Paseo owns the route, header, close action, host picker, error boundary, and query client. The plugin owns the surface body.
 

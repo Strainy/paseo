@@ -15,6 +15,7 @@ import type { Theme } from "@/styles/theme";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { usePluginHostNavigation } from "./host-navigation";
 import { resolvePluginIcon } from "./icons";
+import { setPluginSidebarBadgeCount } from "./sidebar-badge";
 import { toPluginTheme } from "./theme";
 import { useInstalledPlugin, usePluginInstallations } from "./registry";
 import { buildPluginSurfaceRoute } from "./routes";
@@ -68,9 +69,19 @@ function SurfaceRenderer({
   theme: PluginTheme;
 }) {
   const navigation = usePluginHostNavigation(host.id);
+  const updateSidebarBadge = useCallback(
+    (itemId: string, count: number) => setPluginSidebarBadgeCount(plugin, itemId, count),
+    [plugin],
+  );
   return (
     <PluginRuntimeBoundary plugin={plugin} runtime={runtime}>
-      <Surface theme={theme} host={host} layout={layout} navigation={navigation} />
+      <Surface
+        theme={theme}
+        host={host}
+        layout={layout}
+        navigation={navigation}
+        setSidebarBadgeCount={updateSidebarBadge}
+      />
     </PluginRuntimeBoundary>
   );
 }

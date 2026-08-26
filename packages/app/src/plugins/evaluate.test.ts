@@ -49,6 +49,7 @@ describe("plugin client runtime modules", () => {
       .__pluginSdkUnderTest;
 
     expect(Object.keys(sdk ?? {}).sort()).toEqual(Object.keys(PluginServerSdk).sort());
+    expect(sdk?.PluginSidebarBadgeSchema).toBeDefined();
     expect(typeof sdk?.defineRpc).toBe("function");
   });
 
@@ -380,6 +381,47 @@ describe("evaluatePluginClientBundle", () => {
         `),
       ),
     ).toThrow("Duplicate theme: mocha");
+  });
+
+  it("carries a sidebar badge contract through to the installed contribution", () => {
+    const plugin = evaluatePluginClientBundle(
+      "example",
+      bundle(`
+        function Surface() { return null; }
+        plugin.addSurface("main", Surface);
+        plugin.addSidebarItem({
+          id: "main",
+          title: "Example",
+          icon: "Blocks",
+          surface: "main",
+          badge: { rpc: { name: "example.badge", input: {}, output: {} }, intervalMs: 30000 },
+        });
+      `),
+    );
+
+    expect(plugin.sidebarItems[0]?.badge).toEqual({
+      rpc: { name: "example.badge", input: {}, output: {} },
+      intervalMs: 30000,
+    });
+  });
+
+  it("rejects a sidebar badge without a usable RPC contract", () => {
+    expect(() =>
+      evaluatePluginClientBundle(
+        "example",
+        bundle(`
+          function Surface() { return null; }
+          plugin.addSurface("main", Surface);
+          plugin.addSidebarItem({
+            id: "main",
+            title: "Example",
+            icon: "Blocks",
+            surface: "main",
+            badge: { rpc: {} },
+          });
+        `),
+      ),
+    ).toThrow("invalid badge RPC");
   });
 
   it("rejects a sidebar placement whose surface does not exist", () => {

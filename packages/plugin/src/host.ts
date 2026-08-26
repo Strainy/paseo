@@ -1,4 +1,5 @@
 import { PluginAttachmentSearchPayloadSchema } from "./attachments.js";
+import { PluginSidebarBadgeSchema, resolvePluginSidebarBadgeInterval } from "./badges.js";
 export { PluginClientStateProvider, type PluginClientStateSource } from "./client-state.js";
 export {
   usePluginRuntimeContextBridge,
@@ -93,6 +94,15 @@ export function createPluginContext(
   };
 }
 
+export async function readPluginSidebarBadge(
+  contribution: PluginSidebarContribution,
+  invoke: (method: string, input: unknown) => Promise<unknown>,
+) {
+  if (!contribution.badge) return null;
+  const output = await callPluginRpc(contribution.badge.rpc, invoke, {});
+  return PluginSidebarBadgeSchema.parseAsync(output);
+}
+
 export async function searchPluginAttachments(
   source: PluginAttachmentSourceContribution,
   invoke: (method: string, input: unknown) => Promise<unknown>,
@@ -104,6 +114,7 @@ export async function searchPluginAttachments(
 
 export {
   callPluginRpc,
+  resolvePluginSidebarBadgeInterval,
   PaseoApiProvider,
   PluginProjectProvider,
   PluginNavigationProvider,
