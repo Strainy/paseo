@@ -17,6 +17,7 @@ import type {
   PluginTimelineTransformResult,
   PluginCleanup,
   PluginOpenWorkspaceOptions,
+  PluginSidebarBadgeContribution,
 } from "../contracts.js";
 
 export interface PluginHostProps {
@@ -39,7 +40,13 @@ interface PluginNavigableHostProps extends PluginHostProps {
   };
 }
 
-export interface PluginSurfaceProps extends PluginNavigableHostProps {}
+export interface PluginSurfaceProps extends PluginNavigableHostProps {
+  /**
+   * Updates a contributed sidebar item's visible badge without waiting for its
+   * next poll. Older hosts omit this callback.
+   */
+  setSidebarBadgeCount?(itemId: string, count: number): void;
+}
 
 export interface PluginIconProps {
   name: string;
@@ -125,6 +132,7 @@ export interface PluginSidebarContribution {
   title: string;
   icon: string;
   surface: string;
+  badge?: PluginSidebarBadgeContribution;
 }
 
 export type PluginTimelineTransformerContribution<
