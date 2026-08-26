@@ -55,6 +55,7 @@ describe("plugin surface host runtime", () => {
     const runtime = createPluginSurfaceRuntime(selected.client, {
       id: "workspace-plugin",
       lifetime: new AbortController(),
+      serverId: "host-a",
     });
     if (!runtime) throw new Error("Expected selected host runtime");
 
@@ -84,10 +85,12 @@ describe("plugin surface host runtime", () => {
     const first = createPluginSurfaceRuntime(hostA.client, {
       id: "same-plugin",
       lifetime: new AbortController(),
+      serverId: "host-a",
     });
     const second = createPluginSurfaceRuntime(hostB.client, {
       id: "same-plugin",
       lifetime: new AbortController(),
+      serverId: "host-b",
     });
     if (!first || !second) throw new Error("Expected online host runtimes");
 
@@ -105,7 +108,11 @@ describe("plugin surface host runtime", () => {
     const otherHost = clientWithWorkspace("workspace-online");
 
     expect(
-      createPluginSurfaceRuntime(null, { id: "same-plugin", lifetime: new AbortController() }),
+      createPluginSurfaceRuntime(null, {
+        id: "same-plugin",
+        lifetime: new AbortController(),
+        serverId: "host-a",
+      }),
     ).toBeNull();
     expect(otherHost.createWorkspace).not.toHaveBeenCalled();
   });

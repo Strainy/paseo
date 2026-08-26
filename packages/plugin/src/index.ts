@@ -1,5 +1,9 @@
 // Shared SDK entry. Keep runtime-specific imports and re-exports on /client or /server.
 export type {
+  PluginNavigation,
+  PluginOpenWorkspaceOptions,
+  PluginProjectPlacementSnapshot,
+  PluginProjectSnapshot,
   PluginTheme,
   PluginWorkspaceSnapshot,
   PluginAgentSnapshot,

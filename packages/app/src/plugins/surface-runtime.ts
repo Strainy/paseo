@@ -2,19 +2,23 @@ import { useEffect, useState } from "react";
 import type { InstalledPlugin } from "./types";
 import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { PluginNavigation } from "@getpaseo/plugin";
+import { createPluginNavigation } from "./navigation";
 
 export interface PluginSurfaceRuntime {
   paseo: PaseoApi;
+  navigation: PluginNavigation;
   invoke(method: string, input: unknown): Promise<unknown>;
 }
 
 export function createPluginSurfaceRuntime(
   client: DaemonClient | null,
-  plugin: Pick<InstalledPlugin, "id" | "lifetime">,
+  plugin: Pick<InstalledPlugin, "id" | "lifetime" | "serverId">,
 ): PluginSurfaceRuntime | null {
   if (!client || plugin.lifetime.signal.aborted) return null;
   return {
     paseo: createPaseoApi(client, { signal: plugin.lifetime.signal }),
+    navigation: createPluginNavigation({ serverId: plugin.serverId, workspaceId: null }),
     invoke: (method, input) => client.invokePluginRpc(plugin.id, method, input),
   };
 }

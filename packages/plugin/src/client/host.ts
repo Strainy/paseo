@@ -19,3 +19,5 @@ export async function searchPluginAttachments(
 }
 
 export { callPluginRpc, PaseoApiProvider, PluginRpcProvider };
+export { PluginNavigationProvider } from "../navigation-context.js";
+export { PluginProjectProvider } from "../project-context.js";

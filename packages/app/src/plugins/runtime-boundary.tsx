@@ -1,6 +1,15 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { PaseoApiProvider, PluginRpcProvider } from "@getpaseo/plugin/client/host";
-import type { ReactNode } from "react";
+import {
+  PaseoApiProvider,
+  PluginNavigationProvider,
+  PluginProjectProvider,
+  PluginRpcProvider,
+} from "@getpaseo/plugin/client/host";
+import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
+import { useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useProjects } from "@/hooks/use-projects";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { toPluginProjectSnapshots } from "./project-catalog";
 import type { InstalledPlugin } from "./types";
 import { usePluginSurfaceRuntime } from "./surface-runtime";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -15,11 +24,33 @@ export function PluginRuntimeBoundary({
   children: ReactNode;
 }) {
   const runtime = usePluginSurfaceRuntime(client, plugin);
+  const { projects } = useProjects();
+  const projectSnapshots = useMemo(() => toPluginProjectSnapshots(projects), [projects]);
+  const paseoByServerId = useRef(new Map<string, { client: object; paseo: PaseoApi }>());
+  const lifetimeSignal = plugin.lifetime.signal;
+  const resolvePaseo = useCallback(
+    (serverId: string): PaseoApi | null => {
+      const snapshot = getHostRuntimeStore().getSnapshot(serverId);
+      if (snapshot?.connectionStatus !== "online" || !snapshot.client) return null;
+      const cached = paseoByServerId.current.get(serverId);
+      if (cached?.client === snapshot.client) return cached.paseo;
+      const paseo = createPaseoApi(snapshot.client, { signal: lifetimeSignal });
+      paseoByServerId.current.set(serverId, { client: snapshot.client, paseo });
+      return paseo;
+    },
+    [lifetimeSignal],
+  );
   if (!runtime) return null;
   return (
     <QueryClientProvider client={plugin.queryClient}>
       <PaseoApiProvider paseo={runtime.paseo}>
-        <PluginRpcProvider invoke={runtime.invoke}>{children}</PluginRpcProvider>
+        <PluginProjectProvider projects={projectSnapshots} resolvePaseo={resolvePaseo}>
+          <PluginRpcProvider invoke={runtime.invoke}>
+            <PluginNavigationProvider navigation={runtime.navigation}>
+              {children}
+            </PluginNavigationProvider>
+          </PluginRpcProvider>
+        </PluginProjectProvider>
       </PaseoApiProvider>
     </QueryClientProvider>
   );

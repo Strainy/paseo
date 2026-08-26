@@ -25,9 +25,10 @@ import {
   type PluginWorkspacePanelContribution,
   type PluginButtonRegistration,
 } from "@getpaseo/plugin/client";
+import * as PluginServerSdk from "@getpaseo/plugin/server";
 import type { EvaluatedPlugin } from "./types";
 import type { ComponentType } from "react";
-import { resolvePluginIcon } from "./icons";
+import { Icon, resolvePluginIcon } from "./icons";
 import { pluginReactNativeRuntime } from "./react-native/runtime";
 import { parsePluginThemeContribution } from "./themes";
 
@@ -373,11 +374,13 @@ export function runPluginClientBundle(
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJsxRuntime;
     if (name === "react-native") return ReactNative;
-    if (name === "@getpaseo/plugin") return pluginSharedRuntime;
+    // Icon is ambient in the SDK (declare const) — the host owns the implementation.
+    if (name === "@getpaseo/plugin") return { ...pluginSharedRuntime, Icon };
     if (name === "@getpaseo/plugin/client") return { ...pluginClientRuntime, useSettings };
     if (name === "@getpaseo/plugin/client/react-native") {
       return pluginReactNativeRuntime;
     }
+    if (name === "@getpaseo/plugin/server") return PluginServerSdk;
     if (name === "@tanstack/react-query") return ReactQuery;
     if (name === "zod") return Zod;
     throw new Error(`Module "${name}" is not available in plugin client code`);
