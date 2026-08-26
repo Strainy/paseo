@@ -52,6 +52,14 @@ export interface PluginAgentSnapshot {
   readonly labels: Readonly<Record<string, string>>;
 }
 
+export interface PluginSidebarBadgeContribution {
+  /** RPC returning `{ count }`. Called with an empty input object. */
+  rpc: PluginRpcContract;
+  /** Poll interval. Defaults to 60s; the host floors it at 15s. */
+  intervalMs?: number;
+}
+
+
 export interface PluginThemeColors {
   background: string;
   foreground: string;
