@@ -1,4 +1,5 @@
 // Shared SDK entry. Keep runtime-specific imports and re-exports on /client or /server.
+export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "./badges.js";
 export type {
   PluginNavigation,
   PluginOpenWorkspaceOptions,
@@ -7,6 +8,7 @@ export type {
   PluginTheme,
   PluginWorkspaceSnapshot,
   PluginAgentSnapshot,
+  PluginSidebarBadgeContribution,
   PluginThemeColors,
   PluginThemeContribution,
   PluginAttachmentSourceContribution,

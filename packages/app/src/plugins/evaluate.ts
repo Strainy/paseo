@@ -178,6 +178,10 @@ export function runPluginClientBundle(
       if (!contribution.icon.trim()) throw new Error(`Sidebar item ${normalizedId} has no icon`);
       resolvePluginIcon(contribution.icon.trim());
       sidebarItemIds.add(normalizedId);
+      const badge = contribution.badge;
+      if (badge && typeof badge.rpc?.name !== "string") {
+        throw new Error(`Sidebar item ${normalizedId} has an invalid badge RPC`);
+      }
       return register(
         collector.sidebarItems,
         {
@@ -185,6 +189,7 @@ export function runPluginClientBundle(
           title: contribution.title.trim(),
           icon: contribution.icon.trim(),
           surface: requireId(contribution.surface, "sidebar surface id"),
+          ...(badge ? { badge } : {}),
         },
         () => sidebarItemIds.delete(normalizedId),
       );

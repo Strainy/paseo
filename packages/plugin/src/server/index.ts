@@ -1,3 +1,5 @@
+export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "../badges.js";
+export type { PluginSidebarBadgeContribution } from "../contracts.js";
 export type {
   PluginHandlerContext,
   PluginServerContext,

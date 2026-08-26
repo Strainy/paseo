@@ -15,6 +15,9 @@ import {
   type ProviderConnection,
   type ProviderRegistration,
 } from "@getpaseo/plugin/server/provider";
+// Namespace, not named imports: this is handed straight to plugin code, so a
+// hand-written list silently drops any export the SDK adds later.
+import * as PluginServerSdk from "@getpaseo/plugin/server";
 import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
 import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { createPluginDaemonTransportFactory } from "./daemon-transport.js";
@@ -58,17 +61,34 @@ let paseo: PaseoApi | null = null;
 let stopping = false;
 const nodeRequire = createRequire(import.meta.url);
 
+// process.send throws ERR_IPC_CHANNEL_CLOSED once the host closes the channel,
+// and an unhandled throw here kills the subprocess with a stack that looks like
+// a plugin crash. A handler that resolves after shutdown has nobody to answer,
+// so dropping the reply is the whole correct behaviour.
+function canSend(): boolean {
+  return typeof process.send === "function" && process.connected;
+}
+
 function send(message: PluginProcessMessage): void {
-  process.send?.(message);
+  if (!canSend()) return;
+  try {
+    process.send?.(message);
+  } catch {
+    // The channel closed between the check and the write.
+  }
 }
 
 function sendAndWait(message: PluginProcessMessage): Promise<void> {
   return new Promise((resolve) => {
-    if (!process.send) {
+    if (!canSend()) {
       resolve();
       return;
     }
-    process.send(message, () => resolve());
+    try {
+      process.send?.(message, () => resolve());
+    } catch {
+      resolve();
+    }
   });
 }
 
@@ -208,12 +228,23 @@ async function closeProviderConnection(connectionId: string): Promise<void> {
   send({ type: "provider.closed", connectionId });
 }
 
+// Both SDK specifiers resolve to the server surface here. A shared module that
+// reaches for a client hook in the subprocess is a bug in the plugin, not
+// something to paper over with a stub. Icon is the exception: it is a client
+// value the host injects, so a bare `undefined` says nothing about why.
+const pluginAuthorRuntime = {
+  ...PluginServerSdk,
+  Icon() {
+    throw new Error("Icon is available only in plugin client code");
+  },
+};
+
 function runtimeRequire(name: string): unknown {
   if (isPluginClientOnlySdkSpecifier(name)) {
     throw new Error(`${name} is available only in plugin client code`);
   }
   if (name === "@getpaseo/plugin") return pluginSharedRuntime;
-  if (name === "@getpaseo/plugin/server") return {};
+  if (name === "@getpaseo/plugin/server") return pluginAuthorRuntime;
   if (name === "@getpaseo/plugin/server/provider") return pluginProviderRuntime;
   if (name === "@getpaseo/plugin/server/acp") return pluginAcpRuntime;
   if (name === "@getpaseo/plugin/client/host")
