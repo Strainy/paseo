@@ -23,6 +23,7 @@ function installation(clientSide: NonNullable<InstalledPlugin["clientSide"]>): I
     commandCenterItems: [],
     clientSide,
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],

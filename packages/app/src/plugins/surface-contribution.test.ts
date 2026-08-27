@@ -28,6 +28,7 @@ function installation(
     commandCenterItems: [],
     clientSide: null,
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],

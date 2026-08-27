@@ -5,6 +5,7 @@ import type {
   PluginClientContribution,
   PluginCleanup,
   PluginComposerPillContribution,
+  PluginNotificationSourceContribution,
   PluginSidebarContribution,
   PluginSurfaceContribution,
   PluginThemeContribution,
@@ -27,6 +28,7 @@ export interface EvaluatedPlugin {
   commandCenterItems: PluginCommandCenterItemContribution[];
   clientSide: PluginClientContribution | null;
   attachmentSources: PluginAttachmentSourceContribution[];
+  notificationSources: PluginNotificationSourceContribution[];
   themes: PluginThemeContribution[];
   timelineTransformers: PluginTimelineTransformerContribution[];
   timelineRenderers: PluginTimelineRendererContribution[];
@@ -42,6 +44,7 @@ export type {
   PluginAttachmentSourceContribution,
   PluginCommandCenterItemContribution,
   PluginComposerPillContribution,
+  PluginNotificationSourceContribution,
   PluginSidebarContribution,
   PluginSurfaceContribution,
   PluginThemeContribution,

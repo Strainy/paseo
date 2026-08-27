@@ -23,6 +23,7 @@ function installed(serverId: string, contributionId = "main"): InstalledPlugin {
     commandCenterItems: [],
     clientSide: null,
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],

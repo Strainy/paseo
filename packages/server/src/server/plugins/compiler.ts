@@ -85,6 +85,7 @@ const REGISTRATIONS_REMOVED_BY_TARGET: Record<PluginBuildTarget, ReadonlySet<str
     "addCommandCenterItem",
     "addClientSide",
     "addAttachmentSource",
+    "addNotificationSource",
     "addTheme",
     "addTimelineTransformer",
     "addTimelineRenderer",

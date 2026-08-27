@@ -36,6 +36,7 @@ export type {
   PluginIconProps,
   PluginOpenWorkspaceOptions,
   PluginPanelLocation,
+  PluginNotificationSourceContribution,
   PluginProjectPlacementSnapshot,
   PluginProjectSnapshot,
   PluginTheme,
@@ -56,6 +57,14 @@ export type {
   PluginWorkspacePanelProps,
   PluginWorkspaceSnapshot,
 } from "./contracts.js";
+export {
+  PluginNotificationEventSchema,
+  PluginNotificationPollResultSchema,
+  PluginNotificationSchema,
+  type PluginNotification,
+  type PluginNotificationEvent,
+  type PluginNotificationPollResult,
+} from "./notifications.js";
 export { usePaseo } from "./paseo-context.js";
 export { usePaseoHost, useProjects } from "./project-context.js";
 export { useAgent, useWorkspace } from "./client-state.js";

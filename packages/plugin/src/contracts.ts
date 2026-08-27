@@ -287,6 +287,14 @@ export interface PluginTimelineRendererContribution<Schema extends ZodType = Zod
   Component: ComponentType<PluginTimelineItemProps<ZodOutput<Schema>>>;
 }
 
+export interface PluginNotificationSourceContribution {
+  id: string;
+  /** RPC returning notification events. Called with an empty input object. */
+  rpc: PluginRpcContract;
+  /** Poll interval. Defaults to 60s; the host floors it at 15s. */
+  intervalMs?: number;
+}
+
 export interface PluginCommandCapabilities {
   paseo: PaseoApi;
   rpc<InputSchema extends ZodType, OutputSchema extends ZodType>(
@@ -354,6 +362,7 @@ export interface PluginContext {
   addCommandCenterItem(contribution: PluginCommandCenterItemContribution): void;
   addClientSide(contribution: PluginClientContribution): void;
   addAttachmentSource(contribution: PluginAttachmentSourceContribution): void;
+  addNotificationSource(contribution: PluginNotificationSourceContribution): void;
   addTheme(contribution: PluginThemeContribution): void;
   addTimelineTransformer<ItemType extends AgentTimelineItem["type"]>(
     contribution: PluginTimelineTransformerContribution<ItemType>,

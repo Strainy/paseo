@@ -1,9 +1,9 @@
 # Plugins
 
 Local plugins contribute daemon RPCs, native app surfaces, workspace panels, Command Center items,
-composer pills, app themes, and composer attachment sources from one `index.ts`. Paseo executes the server contribution in a
-subprocess and evaluates the client contribution in the app runtime. Plugin code is trusted code;
-Paseo does not sandbox it.
+composer pills, notification sources, app themes, and composer attachment sources from one
+`index.ts`. Paseo executes the server contribution in a subprocess and evaluates the client
+contribution in the app runtime. Plugin code is trusted code; Paseo does not sandbox it.
 
 ## Install a directory source
 
@@ -287,6 +287,17 @@ this itself, because `Linking.openURL` ends at `window.open` and the desktop she
 an in-app browser tab (`decideBrowserWindowOpenRequest`). The host routes it through
 `openExternalUrl` instead, and rejects non-http(s) URLs rather than dropping them the way that sink
 does.
+
+Notification sources are client registrations backed by plugin RPC. Paseo polls each source per
+connected plugin installation while the desktop or browser app is running. Sources have their own
+lifecycle and do not require a sidebar item. The RPC returns up to 20 events with stable IDs. Paseo
+persists the last 256 IDs per host, plugin, and source before delivery, so changing an existing
+event's title or body does not raise it again after an update or app restart. Use a new ID only for a
+new event.
+
+The default poll interval is 60 seconds and Paseo floors shorter intervals at 15 seconds. A
+notification can target a contributed surface, workspace, or agent. Mobile uses remote push and
+does not run local plugin notification sources.
 
 ## Contribute timeline items
 

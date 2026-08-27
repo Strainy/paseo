@@ -101,6 +101,7 @@ function Surface() {
 export default function contribute(plugin: PluginContext) {
   plugin.handle(ping, async () => ({ ok: true }));
   plugin.addSurface("main", Surface);
+  plugin.addNotificationSource({ id: "status", rpc: ping });
   return () => undefined;
 }
 `,
@@ -115,6 +116,8 @@ export default function contribute(plugin: PluginContext) {
       expect(serverBundle).not.toContain("Settings");
       expect(clientBundle).not.toContain("Invalid plugin RPC method");
       expect(serverBundle).not.toContain("Invalid plugin RPC method");
+      expect(clientBundle).toContain("addNotificationSource");
+      expect(serverBundle).not.toContain("addNotificationSource");
     },
   );
 });

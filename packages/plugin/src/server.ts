@@ -12,6 +12,15 @@ export type {
   PluginHandlerContext,
   PluginSidebarBadgeContribution,
 } from "./contracts.js";
+export {
+  PluginNotificationEventSchema,
+  PluginNotificationPollResultSchema,
+  PluginNotificationSchema,
+  type PluginNotification,
+  type PluginNotificationEvent,
+  type PluginNotificationPollResult,
+} from "./notifications.js";
+export type { PluginNotificationSourceContribution } from "./contracts.js";
 export { defineRpc, type PluginRpcContract } from "./rpc.js";
 
 export function defineAttachmentSource<Definition extends PluginAttachmentSourceContribution>(

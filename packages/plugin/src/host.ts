@@ -10,6 +10,7 @@ import type {
   PluginCommandCenterItemContribution,
   PluginClientContribution,
   PluginContext,
+  PluginNotificationSourceContribution,
   PluginSidebarContribution,
   PluginSurfaceContribution,
   PluginSurfaceProps,
@@ -19,6 +20,11 @@ import type {
   PluginWorkspacePanelContribution,
 } from "./contracts.js";
 import { PluginNavigationProvider } from "./navigation-context.js";
+import {
+  PluginNotificationPollResultSchema,
+  readPluginNotificationSource,
+  resolvePluginNotificationInterval,
+} from "./notifications.js";
 import { PluginRpcProvider } from "./rpc-context.js";
 import { PaseoApiProvider } from "./paseo-context.js";
 import { PluginProjectProvider } from "./project-context.js";
@@ -32,6 +38,7 @@ interface PluginCollector {
   addCommandCenterItem(contribution: PluginCommandCenterItemContribution): void;
   addClientSide(contribution: PluginClientContribution): void;
   addAttachmentSource(contribution: PluginAttachmentSourceContribution): void;
+  addNotificationSource(contribution: PluginNotificationSourceContribution): void;
   addTheme(contribution: PluginThemeContribution): void;
   addTimelineTransformer(contribution: PluginTimelineTransformerContribution): void;
   addTimelineRenderer(contribution: PluginTimelineRendererContribution): void;
@@ -44,6 +51,7 @@ export interface PluginRegistrationCollector {
   commandCenterItems: PluginCommandCenterItemContribution[];
   clientSide: PluginClientContribution | null;
   attachmentSources: PluginAttachmentSourceContribution[];
+  notificationSources: PluginNotificationSourceContribution[];
   themes: PluginThemeContribution[];
   timelineTransformers: PluginTimelineTransformerContribution[];
   timelineRenderers: PluginTimelineRendererContribution[];
@@ -59,6 +67,7 @@ export function createPluginContext(
   | "addCommandCenterItem"
   | "addClientSide"
   | "addAttachmentSource"
+  | "addNotificationSource"
   | "addTheme"
   | "addTimelineTransformer"
   | "addTimelineRenderer"
@@ -81,6 +90,9 @@ export function createPluginContext(
     },
     addAttachmentSource(contribution) {
       collector.addAttachmentSource(contribution);
+    },
+    addNotificationSource(contribution) {
+      collector.addNotificationSource(contribution);
     },
     addTheme(contribution) {
       collector.addTheme(contribution);
@@ -118,5 +130,8 @@ export {
   PaseoApiProvider,
   PluginProjectProvider,
   PluginNavigationProvider,
+  PluginNotificationPollResultSchema,
   PluginRpcProvider,
+  readPluginNotificationSource,
+  resolvePluginNotificationInterval,
 };

@@ -13,6 +13,7 @@ Local plugins are directory sources installed into one Paseo daemon. A plugin ca
 - React Native surfaces and sidebar items to Paseo clients;
 - workspace and agent panels opened as workspace tabs;
 - global, workspace, and agent actions in the Command Center;
+- local notification sources for desktop and browser clients;
 - dark themes in Settings → Appearance;
 - schema-validated RPC handlers running beside the daemon;
 - normal Paseo operations through the TypeScript SDK;
@@ -40,7 +41,7 @@ The required root manifest is `paseo-plugin.json`. It contains the default plugi
 { "id": "my-plugin" }
 ```
 
-The entry point is `index.ts` at the plugin root. Plugin, surface, sidebar-item, workspace-panel, Command Center item, and attachment-source IDs start with a lowercase letter and contain lowercase letters, numbers, or hyphens.
+The entry point is `index.ts` at the plugin root. Plugin, surface, sidebar-item, workspace-panel, Command Center item, notification-source, and attachment-source IDs start with a lowercase letter and contain lowercase letters, numbers, or hyphens.
 
 The generated declaration file supplies `@getpaseo/plugin`, `@getpaseo/plugin/react-native`, and
 `@getpaseo/plugin/server` types for local typechecking. Paseo supplies the runtime modules.
@@ -746,6 +747,56 @@ function ReviewButton({ repositoryPath, number }: { repositoryPath: string; numb
 Workspace IDs must belong to the selected host, or to the explicit `serverId` when one is passed. A blank ID throws rather than navigating somewhere arbitrary. This is the entire navigation surface — plugins get no router access, no history control, and no route strings.
 
 `useOpenExternal()` leaves the app entirely, handing an http(s) URL to the OS browser. Plugin code cannot do this itself: `Linking.openURL` reaches `window.open`, which the desktop shell turns into an in-app browser tab. Anything that is not `http:` or `https:` throws rather than being silently dropped.
+
+## Notifications
+
+Register a notification source when backend state should raise an OS notification even while the
+plugin surface is closed. The source owns an RPC that returns complete notification events.
+
+`notifications.shared.ts`:
+
+```ts
+import { defineRpc, PluginNotificationPollResultSchema } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+export const reviewNotifications = defineRpc({
+  name: "reviews.notifications",
+  input: z.object({}),
+  output: PluginNotificationPollResultSchema,
+});
+```
+
+`index.ts`:
+
+```ts
+import type { PluginContext } from "@getpaseo/plugin";
+import { listReviewNotifications } from "./notifications.server";
+import { reviewNotifications } from "./notifications.shared";
+
+export default function contribute(plugin: PluginContext) {
+  plugin.handle(reviewNotifications, listReviewNotifications);
+  plugin.addNotificationSource({
+    id: "review-requests",
+    rpc: reviewNotifications,
+    intervalMs: 60_000,
+  });
+  return () => {};
+}
+```
+
+The handler returns `{ notifications: [...] }` with at most 20 events. Each event has a stable `id`
+and `title`, plus optional `body`, `surface`, `workspaceId`, and `agentId`. `surface` names a surface
+registered by the same plugin. Pair `agentId` with `workspaceId` so a click can restore the agent
+from a cold app.
+
+Paseo polls every connected installation separately while the desktop or browser app is running.
+The default interval is 60 seconds and shorter values are raised to 15 seconds. Paseo persists the
+last 256 event IDs per host, plugin, and source before delivery. Return the same event ID when a pull
+request or other item changes; an update does not raise another notification, including after an app
+restart. Assign a new ID only when a new notification-worthy event occurs. Notification sources do
+not require a sidebar contribution.
+
+Mobile plugin notifications require remote push; local sources run on desktop and browser only.
 
 ## Use the Paseo SDK
 

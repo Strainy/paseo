@@ -29,6 +29,28 @@ const SDK_DECLARATIONS = `declare module "@getpaseo/plugin/server" {
     items: PluginAttachmentItem[];
   }
 
+  export interface PluginNotification {
+    title: string;
+    body?: string;
+    workspaceId?: string;
+    agentId?: string;
+    surface?: string;
+  }
+
+  export interface PluginNotificationEvent extends PluginNotification {
+    id: string;
+  }
+
+  export interface PluginNotificationPollResult {
+    notifications: PluginNotificationEvent[];
+  }
+
+  export interface PluginNotificationSourceContribution {
+    id: string;
+    rpc: PluginRpcContract;
+    intervalMs?: number;
+  }
+
   export interface PluginAttachmentSourceContribution {
     id: string;
     title: string;
@@ -54,7 +76,6 @@ const SDK_DECLARATIONS = `declare module "@getpaseo/plugin/server" {
 
   export const PluginAttachmentItemSchema: import("zod").ZodType<PluginAttachmentItem>;
   export const PluginAttachmentSearchPayloadSchema: import("zod").ZodType<PluginAttachmentSearchPayload>;
-
   export interface PluginSidebarBadge { count: number; }
   export const PluginSidebarBadgeSchema: import("zod").ZodType<PluginSidebarBadge>;
 
@@ -62,6 +83,9 @@ const SDK_DECLARATIONS = `declare module "@getpaseo/plugin/server" {
     rpc: PluginRpcContract;
     intervalMs?: number;
   }
+  export const PluginNotificationSchema: import("zod").ZodType<PluginNotification>;
+  export const PluginNotificationEventSchema: import("zod").ZodType<PluginNotificationEvent>;
+  export const PluginNotificationPollResultSchema: import("zod").ZodType<PluginNotificationPollResult>;
 }
 
 declare module "@getpaseo/plugin/react-native" {
@@ -112,6 +136,8 @@ declare module "@getpaseo/plugin" {
   import type {
     PluginAttachmentSourceContribution,
     PluginHandlerContext,
+    PluginNotification,
+    PluginNotificationSourceContribution,
     PluginRpcContract,
   } from "@getpaseo/plugin/server";
 
@@ -119,12 +145,19 @@ declare module "@getpaseo/plugin" {
     PluginAttachmentItemSchema,
     PluginAttachmentSearchPayloadSchema,
     PluginSidebarBadgeSchema,
+    PluginNotificationEventSchema,
+    PluginNotificationPollResultSchema,
+    PluginNotificationSchema,
     defineAttachmentSource,
     defineRpc,
     type PluginAttachmentItem,
     type PluginAttachmentSearchPayload,
     type PluginAttachmentSourceContribution,
     type PluginHandlerContext,
+    type PluginNotification,
+    type PluginNotificationEvent,
+    type PluginNotificationPollResult,
+    type PluginNotificationSourceContribution,
     type PluginRpcContract,
     type PluginSidebarBadge,
     type PluginSidebarBadgeContribution,
@@ -375,6 +408,7 @@ declare module "@getpaseo/plugin" {
     addCommandCenterItem(contribution: PluginCommandCenterItemContribution): void;
     addClientSide(contribution: PluginClientContribution): void;
     addAttachmentSource(contribution: PluginAttachmentSourceContribution): void;
+    addNotificationSource(contribution: PluginNotificationSourceContribution): void;
     addTheme(contribution: PluginThemeContribution): void;
     addTimelineTransformer<ItemType extends AgentTimelineItem["type"]>(contribution: PluginTimelineTransformerContribution<ItemType>): void;
     addTimelineRenderer<Schema extends ZodType>(contribution: PluginTimelineRendererContribution<Schema>): void;
