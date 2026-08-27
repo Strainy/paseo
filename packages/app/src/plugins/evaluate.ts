@@ -14,6 +14,7 @@ import * as Zod from "zod";
 import {
   type PluginAttachmentSourceContribution,
   type PluginCleanup,
+  type PluginNotificationSourceContribution,
   type PluginThemeContribution,
 } from "@getpaseo/plugin";
 import {
@@ -27,6 +28,7 @@ import {
   type PluginWorkspacePanelContribution,
   type PluginButtonRegistration,
 } from "@getpaseo/plugin/client";
+import { resolvePluginNotificationInterval } from "@getpaseo/plugin/client/host";
 import type { EvaluatedPlugin } from "./types";
 import type { ComponentType } from "react";
 import { resolvePluginIcon } from "./icons";
@@ -96,6 +98,7 @@ export function runPluginClientBundle(
     commandCenterItems: [],
     clientSlashCommands: [],
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],
@@ -107,6 +110,7 @@ export function runPluginClientBundle(
   const commandCenterItemIds = new Set<string>();
   const clientSlashCommandNames = new Set<string>();
   const attachmentSourceIds = new Set<string>();
+  const notificationSourceIds = new Set<string>();
   const themeIds = new Set<string>();
   const timelineTransformerIds = new Set<string>();
   const timelineRendererIds = new Set<string>();
@@ -315,6 +319,25 @@ export function runPluginClientBundle(
         () => attachmentSourceIds.delete(normalizedId),
       );
     },
+    addNotificationSource(contribution: PluginNotificationSourceContribution) {
+      const normalizedId = requireId(contribution.id, "notification source id");
+      if (notificationSourceIds.has(normalizedId)) {
+        throw new Error(`Duplicate notification source: ${normalizedId}`);
+      }
+      const method = contribution.rpc?.name?.trim();
+      if (!method) throw new Error(`Notification source ${normalizedId} has no RPC`);
+      const intervalMs = resolvePluginNotificationInterval(contribution.intervalMs);
+      notificationSourceIds.add(normalizedId);
+      return register(
+        collector.notificationSources,
+        {
+          id: normalizedId,
+          rpc: { ...contribution.rpc, name: method },
+          intervalMs,
+        },
+        () => notificationSourceIds.delete(normalizedId),
+      );
+    },
     addTheme(contribution: PluginThemeContribution) {
       const normalizedId = requireId(contribution.id, "theme id");
       if (themeIds.has(normalizedId)) throw new Error(`Duplicate theme: ${normalizedId}`);
@@ -457,6 +480,7 @@ export function runPluginClientBundle(
     commandCenterItems: collector.commandCenterItems,
     clientSlashCommands: collector.clientSlashCommands,
     attachmentSources: collector.attachmentSources,
+    notificationSources: collector.notificationSources,
     themes: collector.themes,
     timelineTransformers: collector.timelineTransformers,
     timelineRenderers: collector.timelineRenderers,

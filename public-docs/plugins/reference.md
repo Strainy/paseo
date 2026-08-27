@@ -18,6 +18,7 @@ Local plugins are directory sources installed into one Paseo daemon. A plugin ca
 - workspace and agent panels opened as workspace tabs;
 - global, workspace, and agent actions in the Command Center;
 - slash commands in the message composer;
+- local notification sources for desktop and browser clients;
 - transformed and daemon-pushed agent timeline rows;
 - light and dark themes in Settings → Appearance;
 - schema-validated RPC handlers running beside the daemon;
@@ -98,8 +99,9 @@ and cannot show this new diagnostic.
 At least one entry is required; both accept `.ts` or `.tsx`. A directory that still has only the
 old `index.ts` fails to load and points at the [migration guide](/docs/plugins/migration).
 
-Plugin, surface, sidebar-item, workspace-panel, Command Center item, attachment-source, and
-slash-command IDs start with a lowercase letter and contain lowercase letters, numbers, or hyphens.
+Plugin, surface, sidebar-item, workspace-panel, Command Center item, notification-source,
+attachment-source, and slash-command IDs start with a lowercase letter and contain lowercase
+letters, numbers, or hyphens.
 
 The generated `package.json` installs `@getpaseo/plugin` and the other host modules as development
 dependencies for local typechecking and tests. Paseo supplies their runtime instances. Consumers do
@@ -1614,6 +1616,56 @@ an action already in progress.
 `remove()` is idempotent. Updates after removal do nothing. Paseo removes outstanding buttons when
 the plugin installation or host connection is torn down. Return cleanup from the client entry for
 your subscriptions, timers, and other resources.
+
+## Notifications
+
+Register a notification source when backend state should raise an OS notification even while the
+plugin surface is closed. The source owns an RPC that returns complete notification events.
+
+`notifications.shared.ts`:
+
+```ts
+import { defineRpc, PluginNotificationPollResultSchema } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+export const reviewNotifications = defineRpc({
+  name: "reviews.notifications",
+  input: z.object({}),
+  output: PluginNotificationPollResultSchema,
+});
+```
+
+`index.ts`:
+
+```ts
+import type { PluginContext } from "@getpaseo/plugin";
+import { listReviewNotifications } from "./notifications.server";
+import { reviewNotifications } from "./notifications.shared";
+
+export default function contribute(plugin: PluginContext) {
+  plugin.handle(reviewNotifications, listReviewNotifications);
+  plugin.addNotificationSource({
+    id: "review-requests",
+    rpc: reviewNotifications,
+    intervalMs: 60_000,
+  });
+  return () => {};
+}
+```
+
+The handler returns `{ notifications: [...] }` with at most 20 events. Each event has a stable `id`
+and `title`, plus optional `body`, `surface`, `workspaceId`, and `agentId`. `surface` names a surface
+registered by the same plugin. Pair `agentId` with `workspaceId` so a click can restore the agent
+from a cold app.
+
+Paseo polls every connected installation separately while the desktop or browser app is running.
+The default interval is 60 seconds and shorter values are raised to 15 seconds. Paseo persists the
+last 256 event IDs per host, plugin, and source before delivery. Return the same event ID when a pull
+request or other item changes; an update does not raise another notification, including after an app
+restart. Assign a new ID only when a new notification-worthy event occurs. Notification sources do
+not require a sidebar contribution.
+
+Mobile plugin notifications require remote push; local sources run on desktop and browser only.
 
 ## Use the Paseo SDK
 

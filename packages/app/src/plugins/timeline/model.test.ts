@@ -21,6 +21,7 @@ function plugin(input: {
     commandCenterItems: [],
     clientSlashCommands: [],
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [
       {
