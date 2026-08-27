@@ -1,6 +1,7 @@
 // Shared SDK entry. Keep runtime-specific imports and re-exports on /client or /server.
 export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "./badges.js";
 export type {
+  PluginNotificationSourceContribution,
   PluginTheme,
   PluginWorkspaceSnapshot,
   PluginAgentSnapshot,
@@ -22,3 +23,11 @@ export {
   type PluginAttachmentSearchPayload,
 } from "./attachments.js";
 export { defineRpc, type PluginRpcContract, type RpcInput, type RpcOutput } from "./rpc.js";
+export {
+  PluginNotificationEventSchema,
+  PluginNotificationPollResultSchema,
+  PluginNotificationSchema,
+  type PluginNotification,
+  type PluginNotificationEvent,
+  type PluginNotificationPollResult,
+} from "./notifications.js";
