@@ -26,6 +26,7 @@ function installedPlugin(): InstalledPlugin {
     workspacePanels: [],
     commandCenterItems: [],
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],

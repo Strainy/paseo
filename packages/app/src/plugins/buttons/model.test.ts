@@ -19,6 +19,7 @@ function installation(): InstalledPlugin {
     commandCenterItems: [],
     clientSlashCommands: [],
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],
