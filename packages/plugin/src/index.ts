@@ -3,6 +3,7 @@ export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "./badges.js";
 export type {
   PluginNavigation,
   PluginOpenWorkspaceOptions,
+  PluginNotificationSourceContribution,
   PluginProjectPlacementSnapshot,
   PluginProjectSnapshot,
   PluginTheme,
@@ -26,3 +27,11 @@ export {
   type PluginAttachmentSearchPayload,
 } from "./attachments.js";
 export { defineRpc, type PluginRpcContract, type RpcInput, type RpcOutput } from "./rpc.js";
+export {
+  PluginNotificationEventSchema,
+  PluginNotificationPollResultSchema,
+  PluginNotificationSchema,
+  type PluginNotification,
+  type PluginNotificationEvent,
+  type PluginNotificationPollResult,
+} from "./notifications.js";

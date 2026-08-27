@@ -140,4 +140,12 @@ export interface PluginTimelineTransformResult {
   items: PluginTimelineItem[];
 }
 
+export interface PluginNotificationSourceContribution {
+  id: string;
+  /** RPC returning notification events. Called with an empty input object. */
+  rpc: PluginRpcContract;
+  /** Poll interval. Defaults to 60s; the host floors it at 15s. */
+  intervalMs?: number;
+}
+
 export type PluginCleanup = () => void | Promise<void>;

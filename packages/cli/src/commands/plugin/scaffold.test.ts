@@ -121,6 +121,12 @@ export const inspect = defineRpc({
   input: z.object({}),
   output: z.object({ configured: z.boolean() }),
 });
+
+export const notifications = defineRpc({
+  name: "notifications",
+  input: z.object({}),
+  output: PluginNotificationPollResultSchema,
+});
 `,
       ),
       writeFile(
@@ -134,6 +140,10 @@ export async function inspectConfig(
   { paseo }: PluginHandlerContext,
 ) {
   return { configured: Boolean((await paseo.config.get()).config) };
+}
+
+export function listNotifications() {
+  return { notifications: [] };
 }
 `,
       ),

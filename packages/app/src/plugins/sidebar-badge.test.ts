@@ -24,6 +24,7 @@ function installedPlugin(): InstalledPlugin {
     commandCenterItems: [],
     clientSide: null,
     attachmentSources: [],
+    notificationSources: [],
     themes: [],
     timelineTransformers: [],
     timelineRenderers: [],
