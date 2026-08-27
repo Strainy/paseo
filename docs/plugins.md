@@ -1,7 +1,7 @@
 # Plugins
 
 Local plugins contribute daemon RPCs, native app surfaces, workspace panels, Command Center items,
-client slash commands, timeline items, header buttons, composer pills, app themes, composer attachment sources, and settings screens.
+client slash commands, timeline items, header buttons, composer pills, notification sources, app themes, composer attachment sources, and settings screens.
 Paseo executes `index.server.ts` in a subprocess and `index.client.tsx` in every connected app.
 
 > **Trust every plugin you add.** `paseo plugin add` and `paseo plugin install` mean “I trust this codebase.” Plugins are unsandboxed: server code and Git preparation commands run with the daemon user's access on the daemon host, and client contributions run inside Paseo. The repository's dependencies and future updates are part of that trust decision. With `--host`, preparation runs on that remote daemon host.
@@ -377,6 +377,17 @@ placement can reuse behavior without copying registration or action state.
 Native sheets teleport their children. Button surfaces rebuild the installation's SDK, state,
 query, and toast providers inside the surface content, including overflow pages from different
 plugins. Providers only around the trigger do not reach those bodies.
+
+Notification sources are client registrations backed by plugin RPC. Paseo polls each source per
+connected plugin installation while the desktop or browser app is running. Sources have their own
+lifecycle and do not require a sidebar item. The RPC returns up to 20 events with stable IDs. Paseo
+persists the last 256 IDs per host, plugin, and source before delivery, so changing an existing
+event's title or body does not raise it again after an update or app restart. Use a new ID only for a
+new event.
+
+The default poll interval is 60 seconds and Paseo floors shorter intervals at 15 seconds. A
+notification can target a contributed surface, workspace, or agent. Mobile uses remote push and
+does not run local plugin notification sources.
 
 ## Contribute timeline items
 
