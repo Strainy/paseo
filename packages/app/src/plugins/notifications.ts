@@ -1,6 +1,6 @@
 import type { PluginNotificationSourceContribution } from "@getpaseo/plugin";
 import { PluginNotificationSchema, type PluginNotification } from "@getpaseo/plugin";
-import { readPluginNotificationSource } from "@getpaseo/plugin/host";
+import { readPluginNotificationSource } from "@getpaseo/plugin/client/host";
 import { sendOsNotification } from "@/utils/os-notifications";
 import type {
   PluginNotificationReceiptScope,

@@ -90,6 +90,7 @@ export class PluginRegistry {
           sidebarItems: [],
           workspacePanels: [],
           commandCenterItems: [],
+          notificationSources: [],
           clientSlashCommands: [],
           attachmentSources: [],
           themes: [],

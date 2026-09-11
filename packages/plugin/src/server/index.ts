@@ -1,5 +1,8 @@
 export { PluginSidebarBadgeSchema, type PluginSidebarBadge } from "../badges.js";
-export type { PluginSidebarBadgeContribution, PluginNotificationSourceContribution } from "../contracts.js";
+export type {
+  PluginSidebarBadgeContribution,
+  PluginNotificationSourceContribution,
+} from "../contracts.js";
 export {
   PluginNotificationEventSchema,
   PluginNotificationPollResultSchema,

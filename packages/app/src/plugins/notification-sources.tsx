@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { PluginNotificationSourceContribution } from "@getpaseo/plugin";
-import { resolvePluginNotificationInterval } from "@getpaseo/plugin/host";
+import { resolvePluginNotificationInterval } from "@getpaseo/plugin/client/host";
 import { useMemo } from "react";
 import { isNative } from "@/constants/platform";
 import { useFetchQuery } from "@/data/query";
@@ -8,7 +8,7 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { pluginNotificationReceiptStore } from "./notification-receipts";
 import { createPluginNotifier, pollPluginNotificationSource } from "./notifications";
 import { useInstalledPlugins } from "./registry";
-import { createPluginSurfaceRuntime } from "./surface-runtime";
+import { usePluginSurfaceRuntime } from "./surface-runtime";
 import type { InstalledPlugin } from "./types";
 
 function PluginNotificationSourcePoller({
@@ -19,10 +19,7 @@ function PluginNotificationSourcePoller({
   source: PluginNotificationSourceContribution;
 }) {
   const client = useHostRuntimeClient(plugin.serverId);
-  const runtime = useMemo(
-    () => createPluginSurfaceRuntime(client, plugin.id, plugin.serverId),
-    [client, plugin.id, plugin.serverId],
-  );
+  const runtime = usePluginSurfaceRuntime(client, plugin);
   const notifier = useMemo(
     () =>
       createPluginNotifier({

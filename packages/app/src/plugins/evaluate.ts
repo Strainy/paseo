@@ -26,11 +26,10 @@ import {
   type PluginWorkspacePanelContribution,
   type PluginButtonRegistration,
 } from "@getpaseo/plugin/client";
-import * as PluginServerSdk from "@getpaseo/plugin/server";
 import { resolvePluginNotificationInterval } from "@getpaseo/plugin/client/host";
 import type { EvaluatedPlugin } from "./types";
 import type { ComponentType } from "react";
-import { Icon, resolvePluginIcon } from "./icons";
+import { resolvePluginIcon } from "./icons";
 import { pluginReactNativeRuntime } from "./react-native/runtime";
 import { parsePluginThemeContribution } from "./themes";
 
@@ -78,6 +77,8 @@ export type PluginClientRuntime = Pick<
   | "rpc"
   | "openSettings"
   | "openSurface"
+  | "openWorkspace"
+  | "openExternal"
   | "openPanel"
   | "addComposerPill"
   | "addHeaderButton"
@@ -327,11 +328,15 @@ export function runPluginClientBundle(
       if (!method) throw new Error(`Notification source ${normalizedId} has no RPC`);
       const intervalMs = resolvePluginNotificationInterval(contribution.intervalMs);
       notificationSourceIds.add(normalizedId);
-      collector.notificationSources.push({
-        id: normalizedId,
-        rpc: { ...contribution.rpc, name: method },
-        intervalMs,
-      });
+      return register(
+        collector.notificationSources,
+        {
+          id: normalizedId,
+          rpc: { ...contribution.rpc, name: method },
+          intervalMs,
+        },
+        () => notificationSourceIds.delete(normalizedId),
+      );
     },
     addTheme(contribution: PluginThemeContribution) {
       const normalizedId = requireId(contribution.id, "theme id");
@@ -398,13 +403,11 @@ export function runPluginClientBundle(
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJsxRuntime;
     if (name === "react-native") return ReactNative;
-    // Icon is ambient in the SDK (declare const) — the host owns the implementation.
-    if (name === "@getpaseo/plugin") return { ...pluginSharedRuntime, Icon };
+    if (name === "@getpaseo/plugin") return pluginSharedRuntime;
     if (name === "@getpaseo/plugin/client") return { ...pluginClientRuntime, useSettings };
     if (name === "@getpaseo/plugin/client/react-native") {
       return pluginReactNativeRuntime;
     }
-    if (name === "@getpaseo/plugin/server") return PluginServerSdk;
     if (name === "@tanstack/react-query") return ReactQuery;
     if (name === "zod") return Zod;
     throw new Error(`Module "${name}" is not available in plugin client code`);

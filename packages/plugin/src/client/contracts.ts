@@ -16,6 +16,7 @@ import type {
   PluginAttachmentSourceContribution,
   PluginTimelineTransformResult,
   PluginCleanup,
+  PluginNotificationSourceContribution,
   PluginOpenWorkspaceOptions,
   PluginSidebarBadgeContribution,
 } from "../contracts.js";
@@ -93,6 +94,7 @@ export interface PluginClientContext extends PluginCommandCapabilities {
   addHeaderButton(contribution: PluginHeaderButtonContribution): PluginButtonRegistration;
   addComposerPill(contribution: PluginComposerPillContribution): PluginButtonRegistration;
   addAttachmentSource(contribution: PluginAttachmentSourceContribution): PluginCleanup;
+  addNotificationSource(contribution: PluginNotificationSourceContribution): PluginCleanup;
   addTheme(contribution: PluginThemeContribution): PluginCleanup;
   addTimelineTransformer<ItemType extends AgentTimelineItem["type"]>(
     contribution: PluginTimelineTransformerContribution<ItemType>,

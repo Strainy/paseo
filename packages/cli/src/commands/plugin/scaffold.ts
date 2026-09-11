@@ -1,3 +1,6 @@
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { PluginIdSchema } from "@getpaseo/protocol/messages";
 import { resolveCliVersion } from "../../version.js";
 
 const TSCONFIG = {
