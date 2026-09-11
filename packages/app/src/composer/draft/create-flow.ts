@@ -230,7 +230,6 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
         throw error;
       }
 
-
       try {
         await onBeforeSubmit?.({
           attempt,
@@ -239,7 +238,6 @@ export function useDraftAgentCreateFlow<TDraftAgent, TCreateResult>({
           attachments: attempt.attachments,
           cwd,
         });
-
 
         const createResult = await createRequest({
           attempt,
