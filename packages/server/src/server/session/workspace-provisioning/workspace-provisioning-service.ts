@@ -178,7 +178,11 @@ export function createWorkspaceProvisioningService(deps: {
       };
     } catch (error) {
       if (createdWorkspace) {
-        await rollbackFailedImportWorkspace(createdWorkspace, previousProject, projectAfterWorkspace);
+        await rollbackFailedImportWorkspace(
+          createdWorkspace,
+          previousProject,
+          projectAfterWorkspace,
+        );
       }
       throw error;
     }

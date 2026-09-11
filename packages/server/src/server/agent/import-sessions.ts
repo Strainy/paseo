@@ -6,6 +6,7 @@ import type {
   AgentManager,
   ManagedAgent,
   ManagedImportableProviderSession,
+  ManagedImportableSessionsResult,
 } from "./agent-manager.js";
 import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
 import type { AgentPersistenceHandle, AgentProvider } from "./agent-sdk-types.js";
@@ -161,12 +162,14 @@ export async function listImportableProviderSessions(
   let sessions: ManagedImportableProviderSession[];
   let fetchedProviderErrors: Array<{ provider: string; message: string }> = [];
   if (cwdScope) {
-    sessions = await listImportableSessionsForCwdScope({
+    const listing = await listImportableSessionsForCwdScope({
       cwdScope,
       agentManager,
       limit: limit + importedSessions.count,
       providerFilter,
     });
+    sessions = listing.sessions;
+    fetchedProviderErrors = listing.providerErrors;
   } else {
     const listing = await agentManager.listImportableSessions({
       limit: listingLimit,
@@ -394,7 +397,7 @@ async function listImportableSessionsForCwdScope(input: {
   agentManager: Pick<AgentManager, "listImportableSessions">;
   limit: number;
   providerFilter: Set<string> | undefined;
-}): Promise<ManagedImportableProviderSession[]> {
+}): Promise<ManagedImportableSessionsResult> {
   const limit = getImportSessionCwdFanoutLimit(input.agentManager);
   const lists = await Promise.all(
     input.cwdScope.exactCwds.map((cwd) =>
@@ -408,8 +411,21 @@ async function listImportableSessionsForCwdScope(input: {
     ),
   );
 
+  // The same provider fails once per fanned-out cwd; report it once.
+  const providerErrorsByProvider = new Map<
+    string,
+    ManagedImportableSessionsResult["providerErrors"][number]
+  >();
+  for (const result of lists) {
+    for (const providerError of result.providerErrors) {
+      if (!providerErrorsByProvider.has(providerError.provider)) {
+        providerErrorsByProvider.set(providerError.provider, providerError);
+      }
+    }
+  }
+
   const sessionsByHandle = new Map<string, ManagedImportableProviderSession>();
-  for (const session of lists.flat()) {
+  for (const session of lists.flatMap((result) => result.sessions)) {
     // A provider can treat cwd as a hint. Filter before deduplication so an
     // out-of-scope descriptor cannot displace the valid scoped descriptor.
     if (!(await input.cwdScope.matchesCwd(session.cwd))) continue;
@@ -419,9 +435,12 @@ async function listImportableSessionsForCwdScope(input: {
       sessionsByHandle.set(key, session);
     }
   }
-  return Array.from(sessionsByHandle.values()).sort(
-    (left, right) => right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
-  );
+  return {
+    sessions: Array.from(sessionsByHandle.values()).sort(
+      (left, right) => right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
+    ),
+    providerErrors: Array.from(providerErrorsByProvider.values()),
+  };
 }
 
 function getImportSessionCwdFanoutLimit(agentManager: object): ReturnType<typeof pLimit> {

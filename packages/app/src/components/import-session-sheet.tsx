@@ -118,7 +118,16 @@ function buildSessionsQueriesConfig(args: {
   limit: number;
   hostDisconnectedMessage?: string;
 }): SessionsQueryConfig[] {
-  const { providersToFetch, visible, client, cwd, workspaceId, query, limit, hostDisconnectedMessage } = args;
+  const {
+    providersToFetch,
+    visible,
+    client,
+    cwd,
+    workspaceId,
+    query,
+    limit,
+    hostDisconnectedMessage,
+  } = args;
   if (providersToFetch === null) return [];
   const enabled = visible && Boolean(client);
   return providersToFetch.map((provider) => ({

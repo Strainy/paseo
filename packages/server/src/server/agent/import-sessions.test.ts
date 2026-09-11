@@ -538,15 +538,15 @@ test("listImportableProviderSessions scans every linked worktree for a cwd scope
   const linkedCwd = "/tmp/project-linked";
   const listImportableSessions = vi.fn(async ({ cwd }: { cwd?: string }) => {
     if (cwd === mainCwd) {
-      return [
+      return makeImportableSessionsResult([
         makeImportableSession({
           sessionId: "main-session",
           cwd: mainCwd,
           lastActivityAt: "2026-04-30T12:00:00.000Z",
         }),
-      ];
+      ]);
     }
-    return [
+    return makeImportableSessionsResult([
       makeImportableSession({
         sessionId: "linked-session",
         cwd: linkedCwd,
@@ -557,7 +557,7 @@ test("listImportableProviderSessions scans every linked worktree for a cwd scope
         cwd: "/tmp/other-project",
         lastActivityAt: "2026-04-30T12:02:00.000Z",
       }),
-    ];
+    ]);
   });
   const exactCwds = [mainCwd, linkedCwd];
 
