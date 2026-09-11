@@ -23,6 +23,8 @@ function registry() {
         },
         openSurface: () => {},
         openSettings: () => {},
+        openWorkspace: () => {},
+        openExternal: async () => {},
         openPanel: () => {},
         addComposerPill: () => ({ update() {}, remove() {} }),
         addHeaderButton: () => ({ update() {}, remove() {} }),
