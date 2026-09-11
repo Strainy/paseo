@@ -1,5 +1,8 @@
 import { PluginSidebarBadgeSchema } from "@getpaseo/plugin";
-import { readPluginSidebarBadge, resolvePluginSidebarBadgeInterval } from "@getpaseo/plugin/host";
+import {
+  readPluginSidebarBadge,
+  resolvePluginSidebarBadgeInterval,
+} from "@getpaseo/plugin/client/host";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import type { PluginSidebarTarget } from "./sidebar-groups";
