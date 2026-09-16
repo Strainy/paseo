@@ -19,7 +19,13 @@ export interface SidebarProjectSectionRowModel {
   trailingAction: SidebarProjectTrailingAction;
 }
 
-export type SidebarProjectRowModel = SidebarProjectSectionRowModel;
+export interface SidebarProjectLeafRowModel {
+  kind: "project_leaf";
+  chevron: null;
+  trailingAction: SidebarProjectTrailingAction;
+}
+
+export type SidebarProjectRowModel = SidebarProjectSectionRowModel | SidebarProjectLeafRowModel;
 
 const EMPTY_MULTIPLICITY_MAP: ReadonlyMap<string, boolean> = new Map();
 function hostTarget(input: {
@@ -118,17 +124,28 @@ function projectTrailingAction(
 
 export function buildSidebarProjectRowModel(input: {
   project: SidebarProjectEntry;
+  isEmptyProject: boolean;
   collapsed: boolean;
   preferredServerId?: string | null;
   supportsMultiplicityByServerId?: ReadonlyMap<string, boolean>;
 }): SidebarProjectRowModel {
+  const trailingAction = projectTrailingAction(
+    input.project,
+    input.supportsMultiplicityByServerId ?? EMPTY_MULTIPLICITY_MAP,
+    input.preferredServerId,
+  );
+
+  if (input.isEmptyProject) {
+    return {
+      kind: "project_leaf",
+      chevron: null,
+      trailingAction,
+    };
+  }
+
   return {
     kind: "project_section",
     chevron: input.collapsed ? "expand" : "collapse",
-    trailingAction: projectTrailingAction(
-      input.project,
-      input.supportsMultiplicityByServerId ?? EMPTY_MULTIPLICITY_MAP,
-      input.preferredServerId,
-    ),
+    trailingAction,
   };
 }
