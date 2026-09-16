@@ -71,6 +71,7 @@ describe("buildSidebarProjectRowModel", () => {
         projectKind: "directory",
         workspaces: [workspace({ workspaceId: "ws-non-git", workspaceKind: "checkout" })],
       }),
+      isEmptyProject: false,
       collapsed: false,
     });
 
@@ -87,6 +88,7 @@ describe("buildSidebarProjectRowModel", () => {
         projectKind: "git",
         workspaces: [workspace({ workspaceId: "ws-main", workspaceKind: "checkout" })],
       }),
+      isEmptyProject: false,
       collapsed: true,
     });
 
@@ -100,32 +102,43 @@ describe("buildSidebarProjectRowModel", () => {
     });
   });
 
-  it("shows the new workspace action for a non-git project when the host supports workspace multiplicity", () => {
+  it("renders an empty project as a leaf with the new workspace action when the host supports workspace multiplicity", () => {
     const result = buildSidebarProjectRowModel({
       project: project({ projectKind: "directory", workspaces: [] }),
-      collapsed: false,
+      isEmptyProject: true,
+      collapsed: true,
       supportsMultiplicityByServerId: new Map([["srv", true]]),
     });
 
-    expect(result.trailingAction).toEqual({
-      kind: "new_workspace",
-      target: { serverId: "srv", projectId: "project-srv", iconWorkingDir: "/repo" },
+    expect(result).toEqual({
+      kind: "project_leaf",
+      chevron: null,
+      trailingAction: {
+        kind: "new_workspace",
+        target: { serverId: "srv", projectId: "project-srv", iconWorkingDir: "/repo" },
+      },
     });
   });
 
-  it("hides the new workspace action for a non-git project when the host lacks workspace multiplicity", () => {
+  it("renders an empty project as a leaf without an unavailable new workspace action", () => {
     const result = buildSidebarProjectRowModel({
       project: project({ projectKind: "directory", workspaces: [] }),
+      isEmptyProject: true,
       collapsed: false,
       supportsMultiplicityByServerId: new Map([["srv", false]]),
     });
 
-    expect(result.trailingAction).toEqual({ kind: "none" });
+    expect(result).toEqual({
+      kind: "project_leaf",
+      chevron: null,
+      trailingAction: { kind: "none" },
+    });
   });
 
   it("still shows the new workspace action for a git project regardless of multiplicity", () => {
     const result = buildSidebarProjectRowModel({
       project: project({ projectKind: "git" }),
+      isEmptyProject: false,
       collapsed: false,
       supportsMultiplicityByServerId: new Map([["srv", false]]),
     });
@@ -148,6 +161,7 @@ describe("buildSidebarProjectRowModel", () => {
           { serverId: "host-b", iconWorkingDir: "/repo/b", worktreeSupport: "supported" as const },
         ],
       }),
+      isEmptyProject: false,
       collapsed: false,
     });
 
@@ -176,6 +190,7 @@ describe("buildSidebarProjectRowModel", () => {
           },
         ],
       }),
+      isEmptyProject: false,
       collapsed: false,
       supportsMultiplicityByServerId: new Map([["host-b", true]]),
     });
@@ -197,6 +212,7 @@ describe("buildSidebarProjectRowModel", () => {
           workspace({ workspaceId: "ws-feature", workspaceKind: "worktree" }),
         ],
       }),
+      isEmptyProject: false,
       collapsed: true,
     });
 
@@ -268,9 +284,27 @@ describe("buildSidebarProjectRowModel", () => {
     expect(resolveSidebarProjectLocalPath(groupedProject, "missing")).toBe("");
   });
 
-  it("renders an empty project as an expandable section", () => {
+  it("renders an empty git project as a leaf", () => {
     const result = buildSidebarProjectRowModel({
       project: project({ projectKind: "git", workspaces: [] }),
+      isEmptyProject: true,
+      collapsed: false,
+    });
+
+    expect(result).toEqual({
+      kind: "project_leaf",
+      chevron: null,
+      trailingAction: {
+        kind: "new_workspace",
+        target: { serverId: "srv", projectId: "project-srv", iconWorkingDir: "/repo" },
+      },
+    });
+  });
+
+  it("keeps a non-empty project expandable when pinned workspaces leave no child rows", () => {
+    const result = buildSidebarProjectRowModel({
+      project: project({ projectKind: "git", workspaces: [] }),
+      isEmptyProject: false,
       collapsed: false,
     });
 
