@@ -45,7 +45,7 @@ describe("splitPinnedSidebarGroups", () => {
     expect(result.unpinnedProjects).toEqual([{ ...projects[0], workspaces: [] }]);
   });
 
-  it("keeps a genuinely empty project so its new-workspace row stays reachable", () => {
+  it("keeps a genuinely empty project so its creation action stays reachable", () => {
     const projects = [project("p1", [])];
     const result = splitPinnedSidebarGroups({
       projects,
