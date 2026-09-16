@@ -251,6 +251,7 @@ interface ProjectHeaderRowProps {
   onPress: () => void;
   worktreeTarget: SidebarProjectHostTarget | null;
   isProjectActive?: boolean;
+  onPrepareWorkspaceSetup: () => void;
   onWorkspacePress?: () => void;
   onWorktreeCreated?: (workspaceId: string) => void;
   shortcutNumber?: number | null;
@@ -262,6 +263,42 @@ interface ProjectHeaderRowProps {
   onRemoveProject?: () => void;
   removeProjectStatus?: "idle" | "pending";
   dragHandleProps?: DraggableListDragHandleProps;
+}
+
+const PROJECT_DISCLOSURE_ACCESSIBILITY = {
+  expand: {
+    accessible: true,
+    accessibilityRole: "button" as const,
+    accessibilityState: { expanded: false },
+    tabIndex: undefined,
+  },
+  collapse: {
+    accessible: true,
+    accessibilityRole: "button" as const,
+    accessibilityState: { expanded: true },
+    tabIndex: undefined,
+  },
+};
+
+const PROJECT_LEAF_ACCESSIBILITY = {
+  accessible: false,
+  accessibilityRole: undefined,
+  accessibilityState: undefined,
+  tabIndex: -1,
+} as const;
+
+const PROJECT_DISCLOSURE_WEB_EXPANSION = {
+  expand: { "aria-expanded": false } as const,
+  collapse: { "aria-expanded": true } as const,
+};
+
+function projectRowAccessibilityProps(chevron: ProjectHeaderRowProps["chevron"]) {
+  return chevron === null ? PROJECT_LEAF_ACCESSIBILITY : PROJECT_DISCLOSURE_ACCESSIBILITY[chevron];
+}
+
+function projectRowWebExpansionProps(chevron: ProjectHeaderRowProps["chevron"]) {
+  if (!platformIsWeb || chevron === null) return null;
+  return PROJECT_DISCLOSURE_WEB_EXPANSION[chevron];
 }
 
 interface WorkspaceRowInnerProps {
@@ -411,6 +448,7 @@ function ProjectRowTrailingActions({
   isHovered,
   isMobileBreakpoint,
   isProjectActive,
+  keepNewWorkspaceActionVisible,
   onBeginWorkspaceSetup,
   onRemoveProject,
   removeProjectStatus,
@@ -423,18 +461,26 @@ function ProjectRowTrailingActions({
   isHovered: boolean;
   isMobileBreakpoint: boolean;
   isProjectActive: boolean;
+  keepNewWorkspaceActionVisible: boolean;
   onBeginWorkspaceSetup: () => void;
   onRemoveProject?: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
 }) {
   const actionsVisible = isHovered || platformIsNative || isMobileBreakpoint;
+  const persistentNewWorkspaceAction = keepNewWorkspaceActionVisible && worktreeTarget !== null;
   return (
-    <View style={styles.projectTrailingActions}>
+    <View
+      style={[
+        styles.projectTrailingActions,
+        persistentNewWorkspaceAction && styles.projectTrailingActionsWithPersistentCreate,
+      ]}
+    >
       {worktreeTarget ? (
         <NewWorktreeButton
           displayName={displayName}
           onPress={onBeginWorkspaceSetup}
-          visible={actionsVisible}
+          visible={persistentNewWorkspaceAction || actionsVisible}
+          persistent={persistentNewWorkspaceAction}
           showShortcutHint={isProjectActive}
           testID={`sidebar-project-new-worktree-${projectViewKey}`}
         />
@@ -708,6 +754,7 @@ function NewWorktreeButton({
   displayName,
   onPress,
   visible,
+  persistent = false,
   loading = false,
   testID,
   showShortcutHint = false,
@@ -715,6 +762,7 @@ function NewWorktreeButton({
   displayName: string;
   onPress: () => void;
   visible: boolean;
+  persistent?: boolean;
   loading?: boolean;
   testID: string;
   showShortcutHint?: boolean;
@@ -723,12 +771,12 @@ function NewWorktreeButton({
   const newWorktreeKeys = useShortcutKeys("new-worktree");
 
   const pressableStyle = useCallback(
-    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+    () => [
       styles.projectIconActionButton,
+      persistent && styles.projectIconActionButtonPersistent,
       !visible && styles.projectIconActionButtonHidden,
-      (Boolean(hovered) || pressed) && !loading && styles.projectIconActionButtonHovered,
     ],
-    [visible, loading],
+    [visible, persistent],
   );
 
   const handlePress = useCallback(
@@ -740,31 +788,44 @@ function NewWorktreeButton({
   );
 
   return (
-    <View style={styles.projectTrailingControlSlot} pointerEvents={visible ? "auto" : "none"}>
+    <View
+      style={[
+        styles.projectTrailingControlSlot,
+        persistent && styles.projectTrailingControlSlotPersistent,
+      ]}
+      pointerEvents={visible ? "auto" : "none"}
+    >
       <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild disabled={!visible}>
           <Pressable
             style={pressableStyle}
             onPress={handlePress}
             disabled={loading}
-            accessibilityRole={platformIsWeb ? undefined : "button"}
+            accessibilityRole={platformIsWeb && !persistent ? undefined : "button"}
             accessibilityLabel={t("sidebar.workspace.actions.createWorkspaceFor", {
               projectName: displayName,
             })}
             testID={testID}
           >
-            {({ hovered, pressed }) =>
-              loading ? (
-                <ThemedLoadingSpinner size={14} uniProps={foregroundMutedColorMapping} />
-              ) : (
-                <ThemedPlus
-                  size={15}
-                  uniProps={
-                    hovered || pressed ? foregroundColorMapping : foregroundMutedColorMapping
-                  }
-                />
-              )
-            }
+            {({ hovered, pressed }) => (
+              <View
+                style={[
+                  styles.projectIconActionGlyph,
+                  (hovered || pressed) && !loading && styles.projectIconActionButtonHovered,
+                ]}
+              >
+                {loading ? (
+                  <ThemedLoadingSpinner size={14} uniProps={foregroundMutedColorMapping} />
+                ) : (
+                  <ThemedPlus
+                    size={15}
+                    uniProps={
+                      hovered || pressed ? foregroundColorMapping : foregroundMutedColorMapping
+                    }
+                  />
+                )}
+              </View>
+            )}
           </Pressable>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center" offset={8}>
@@ -859,6 +920,7 @@ function ProjectHeaderRow({
   onPress,
   worktreeTarget,
   isProjectActive = false,
+  onPrepareWorkspaceSetup,
   onWorkspacePress,
   onWorktreeCreated: _onWorktreeCreated,
   shortcutNumber = null,
@@ -878,10 +940,14 @@ function ProjectHeaderRow({
   const localDaemonServerId = useLocalDaemonServerId();
   const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
   const settingsTarget = project.hosts[0] ?? null;
+  const rowAccessibility = projectRowAccessibilityProps(chevron);
+  const rowWebExpansion = projectRowWebExpansionProps(chevron);
+  const isDisclosure = rowAccessibility.accessible;
   const handleBeginWorkspaceSetup = useCallback(() => {
     if (!worktreeTarget) {
       return;
     }
+    onPrepareWorkspaceSetup();
     onWorkspacePress?.();
     router.navigate(
       buildNewWorkspaceRoute({
@@ -891,7 +957,7 @@ function ProjectHeaderRow({
         projectId: worktreeTarget.projectId,
       }) as Href,
     );
-  }, [displayName, onWorkspacePress, worktreeTarget]);
+  }, [displayName, onPrepareWorkspaceSetup, onWorkspacePress, worktreeTarget]);
   const interaction = useLongPressDragInteraction({
     drag,
     menuController,
@@ -910,6 +976,7 @@ function ProjectHeaderRow({
     }
     onPress();
   }, [interaction.didLongPressRef, onPress]);
+  const rowPressHandler = isDisclosure ? handlePress : undefined;
 
   const handlePointerEnter = useCallback(() => {
     if (!contextMenuOpen) setIsHovered(true);
@@ -971,6 +1038,7 @@ function ProjectHeaderRow({
         isHovered={isHovered}
         isMobileBreakpoint={isMobileBreakpoint}
         isProjectActive={isProjectActive}
+        keepNewWorkspaceActionVisible={chevron === null}
         onBeginWorkspaceSetup={handleBeginWorkspaceSetup}
         onRemoveProject={onRemoveProject}
         removeProjectStatus={removeProjectStatus}
@@ -993,13 +1061,15 @@ function ProjectHeaderRow({
         onPointerLeave={handlePointerLeave}
       >
         <PressHighlight
-          accessibilityRole="button"
+          {...rowAccessibility}
+          {...rowWebExpansion}
+          focusable={isDisclosure}
           style={projectRowStyle}
           highlightStyle={styles.projectRowPressed}
           onPressIn={handleProjectPressIn}
           onTouchMove={interaction.handleTouchMove}
           onPressOut={handleProjectPressOut}
-          onPress={handlePress}
+          onPress={rowPressHandler}
           testID={`sidebar-project-row-${project.viewKey}`}
         >
           {rowChildren}
@@ -1019,13 +1089,15 @@ function ProjectHeaderRow({
       >
         <ContextMenuTrigger
           enabledOnMobile={false}
-          accessibilityRole="button"
+          {...rowAccessibility}
+          {...rowWebExpansion}
+          focusable={isDisclosure}
           style={projectRowStyle}
           highlightStyle={styles.projectRowPressed}
           onPressIn={handleProjectPressIn}
           onTouchMove={interaction.handleTouchMove}
           onPressOut={handleProjectPressOut}
-          onPress={handlePress}
+          onPress={rowPressHandler}
           testID={`sidebar-project-row-${project.viewKey}`}
         >
           {rowChildren}
@@ -1542,6 +1614,7 @@ function WorkspaceRow({
 
 function ProjectBlock({
   project,
+  isEmptyProject,
   workspaceEntriesByKey,
   collapsed,
   displayName,
@@ -1568,6 +1641,7 @@ function ProjectBlock({
   onToggleWorkspacePin,
 }: {
   project: SidebarProjectEntry;
+  isEmptyProject: boolean;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   collapsed: boolean;
   displayName: string;
@@ -1610,11 +1684,12 @@ function ProjectBlock({
     () =>
       buildSidebarProjectRowModel({
         project,
+        isEmptyProject,
         collapsed,
         supportsMultiplicityByServerId,
         preferredServerId,
       }),
-    [collapsed, preferredServerId, project, supportsMultiplicityByServerId],
+    [collapsed, isEmptyProject, preferredServerId, project, supportsMultiplicityByServerId],
   );
 
   // Collapsed rows hide their workspace rows, so the project row carries the most urgent
@@ -1758,6 +1833,12 @@ function ProjectBlock({
     onToggleCollapsed(project.viewKey);
   }, [onToggleCollapsed, project.viewKey]);
 
+  const handlePrepareWorkspaceSetup = useCallback(() => {
+    if (collapsed) {
+      onToggleCollapsed(project.viewKey);
+    }
+  }, [collapsed, onToggleCollapsed, project.viewKey]);
+
   let projectChildren = null;
   if (!collapsed) {
     if (project.workspaces.length > 0) {
@@ -1795,7 +1876,10 @@ function ProjectBlock({
           ) : null}
         </>
       );
-    } else if (rowModel.trailingAction.kind === "new_workspace") {
+    } else if (
+      rowModel.kind === "project_section" &&
+      rowModel.trailingAction.kind === "new_workspace"
+    ) {
       projectChildren = (
         <NewWorkspaceGhostRow
           project={project}
@@ -1825,6 +1909,7 @@ function ProjectBlock({
           rowModel.trailingAction.kind === "new_workspace" ? rowModel.trailingAction.target : null
         }
         isProjectActive={active}
+        onPrepareWorkspaceSetup={handlePrepareWorkspaceSetup}
         onWorkspacePress={onWorkspacePress}
         onWorktreeCreated={onWorktreeCreated}
         drag={drag}
@@ -1847,6 +1932,7 @@ type ProjectBlockProps = Parameters<typeof ProjectBlock>[0];
 function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlockProps): boolean {
   return (
     previous.project === next.project &&
+    previous.isEmptyProject === next.isEmptyProject &&
     projectWorkspaceEntriesEqual(previous, next) &&
     previous.collapsed === next.collapsed &&
     previous.displayName === next.displayName &&
@@ -2187,6 +2273,15 @@ function ProjectModeList({
   const selectionEnabled = isWorkspaceRoute;
   const activeWorkspaceSelection = useActiveWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
+  const emptyProjectViewKeys = useMemo(
+    () =>
+      new Set(
+        projects
+          .filter((project) => project.workspaces.length === 0)
+          .map((project) => project.viewKey),
+      ),
+    [projects],
+  );
   const {
     visibleItems: visiblePinnedChats,
     expanded: pinnedChatsExpanded,
@@ -2339,6 +2434,7 @@ function ProjectModeList({
         <MemoProjectBlock
           key={item.viewKey}
           project={item}
+          isEmptyProject={emptyProjectViewKeys.has(item.viewKey)}
           workspaceEntriesByKey={workspaceEntriesByKey}
           collapsed={collapsedProjectKeys.has(item.viewKey)}
           displayName={item.projectName}
@@ -2369,6 +2465,7 @@ function ProjectModeList({
     [
       collapsedProjectKeys,
       activeWorkspaceSelection,
+      emptyProjectViewKeys,
       handleWorktreeCreated,
       manualSort,
       parentGestureRef,
@@ -2572,12 +2669,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.spacing[3],
   },
   workspaceListContainer: {},
-  // Kept in step with `workspaceRow` above. It stands in a project's list where a workspace row
-  // would be, so it takes that row's geometry and both of its fills.
-  //
-  // The one departure is the extra left padding: it only ever renders under its project header, so
-  // the step in reads as belonging to that project. Padding rather than margin, so the hover and
-  // pressed fills stay the same box as every other row in the sidebar.
+  // Kept in step with `workspaceRow` above. This only remains for non-empty projects whose every
+  // workspace is hoisted into Pinned; genuinely empty projects use the header's inline action.
+  // The extra left padding makes the row read as a child while keeping its hover and pressed fills
+  // aligned with the other sidebar rows.
   newWorkspaceGhostRow: {
     minHeight: density.rowHeight,
     marginBottom: theme.spacing[0.5],
@@ -2596,8 +2691,7 @@ const styles = StyleSheet.create((theme) => ({
   newWorkspaceGhostRowPressed: {
     backgroundColor: theme.colors.surface2,
   },
-  // The width of a workspace row's status slot, so the label lands on the same rail as the
-  // titles above it.
+  // Reserve the same leading rail as a workspace status indicator.
   newWorkspaceGhostIconSlot: {
     width: densityIconBox("md"),
     height: densityIconBox("md"),
@@ -2689,6 +2783,18 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     flexShrink: 0,
   },
+  projectIconActionButtonPersistent: {
+    width: 40,
+    height: 40,
+    alignItems: "flex-end",
+  },
+  projectIconActionGlyph: {
+    width: 24,
+    height: 24,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   projectIconActionButtonHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },
@@ -2703,6 +2809,11 @@ const styles = StyleSheet.create((theme) => ({
     // MoreVertical paints only around the center of its 14px SVG. Keep the 24px controls,
     // but pull their painted edge through the unused view-box space onto the row rail.
     marginRight: -6,
+  },
+  // The visible plus gets a 40px target without increasing the row's vertical footprint.
+  projectTrailingActionsWithPersistentCreate: {
+    minHeight: 40,
+    marginVertical: -8,
   },
   projectKebabButton: {
     // Larger on compact so the kebab is an easy tap target. The negative margins keep its
@@ -2728,6 +2839,10 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  projectTrailingControlSlotPersistent: {
+    width: 40,
+    height: 40,
   },
   projectActionTooltipRow: {
     flexDirection: "row",
