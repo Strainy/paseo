@@ -1348,6 +1348,65 @@ test("defaults session RPC waiters to sixty seconds", async () => {
   await expect(responsePromise).rejects.toThrow("Timeout waiting for message (60000ms)");
 });
 
+test("createPaseoWorktree has no client deadline", async () => {
+  useHeartbeatClock();
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const createPromise = client.createPaseoWorktree(
+    {
+      cwd: "/tmp/project",
+      worktreeSlug: "long-worktree-create",
+    },
+    "req-long-worktree-create",
+  );
+  let settled = false;
+  void createPromise.then(
+    () => {
+      settled = true;
+      return undefined;
+    },
+    () => {
+      settled = true;
+      return undefined;
+    },
+  );
+
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(settled).toBe(false);
+
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "create_paseo_worktree_response",
+      payload: {
+        requestId: "req-long-worktree-create",
+        workspace: null,
+        error: "worktree deadline sentinel",
+        setupTerminalId: null,
+      },
+    }),
+  );
+
+  await expect(createPromise).resolves.toEqual({
+    requestId: "req-long-worktree-create",
+    workspace: null,
+    error: "worktree deadline sentinel",
+    setupTerminalId: null,
+  });
+});
+
 test("honors explicit fetchAgent timeout below the session RPC default", async () => {
   useHeartbeatClock();
   const logger = createMockLogger();
