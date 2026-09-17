@@ -975,6 +975,9 @@ function toTimeoutError(error: unknown, label: string, timeoutMs: number): Error
 const DEFAULT_RECONNECT_BASE_DELAY_MS = 1500;
 const DEFAULT_RECONNECT_MAX_DELAY_MS = 30000;
 const DEFAULT_SESSION_RPC_TIMEOUT_MS = 60_000;
+// Worktree provisioning can queue and run several daemon-bounded Git commands.
+// Keep the client waiter alive so a timeout cannot leave the mutation running unseen.
+const WORKTREE_PROVISIONING_RPC_TIMEOUT_MS = 0;
 const PUSH_TOKEN_REVOCATION_TIMEOUT_MS = 2_000;
 const DEFAULT_CONNECT_TIMEOUT_MS = 15_000;
 const DEFAULT_LIVENESS_TIMEOUT_MS = 5000;
@@ -4457,6 +4460,7 @@ export class DaemonClient {
         ...(input.githubPrNumber !== undefined ? { githubPrNumber: input.githubPrNumber } : {}),
       },
       responseType: "create_paseo_worktree_response",
+      timeout: WORKTREE_PROVISIONING_RPC_TIMEOUT_MS,
     });
   }
 
