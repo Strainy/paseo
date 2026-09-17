@@ -1150,6 +1150,257 @@ test("defaults session RPC waiters to sixty seconds", async () => {
   await expect(responsePromise).rejects.toThrow("Timeout waiting for message (60000ms)");
 });
 
+test("createPaseoWorktree has no client deadline", async () => {
+  useHeartbeatClock();
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const createPromise = client.createPaseoWorktree(
+    {
+      cwd: "/tmp/project",
+      worktreeSlug: "long-worktree-create",
+    },
+    "req-long-worktree-create",
+  );
+  let settled = false;
+  void createPromise.then(
+    () => {
+      settled = true;
+      return undefined;
+    },
+    () => {
+      settled = true;
+      return undefined;
+    },
+  );
+
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(settled).toBe(false);
+
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "create_paseo_worktree_response",
+      payload: {
+        requestId: "req-long-worktree-create",
+        workspace: null,
+        error: "worktree deadline sentinel",
+        setupTerminalId: null,
+      },
+    }),
+  );
+
+  await expect(createPromise).resolves.toEqual({
+    requestId: "req-long-worktree-create",
+    workspace: null,
+    error: "worktree deadline sentinel",
+    setupTerminalId: null,
+  });
+});
+
+test("worktree-backed createWorkspace has no client deadline", async () => {
+  useHeartbeatClock();
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const createPromise = client.createWorkspace(
+    {
+      source: {
+        kind: "worktree",
+        cwd: "/tmp/project",
+        worktreeSlug: "long-workspace-create",
+      },
+    },
+    "req-long-workspace-create",
+  );
+  let settled = false;
+  void createPromise.then(
+    () => {
+      settled = true;
+      return undefined;
+    },
+    () => {
+      settled = true;
+      return undefined;
+    },
+  );
+
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(settled).toBe(false);
+
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "workspace.create.response",
+      payload: {
+        requestId: "req-long-workspace-create",
+        workspace: null,
+        error: "workspace deadline sentinel",
+        setupTerminalId: null,
+      },
+    }),
+  );
+
+  await expect(createPromise).resolves.toEqual({
+    requestId: "req-long-workspace-create",
+    workspace: null,
+    error: "workspace deadline sentinel",
+    setupTerminalId: null,
+  });
+});
+
+test("worktree-backed createAgent inputs have no client deadline", async () => {
+  useHeartbeatClock();
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const cases: Array<{
+    label: string;
+    options: Partial<Parameters<DaemonClient["createAgent"]>[0]>;
+  }> = [
+    {
+      label: "worktree target",
+      options: {
+        worktree: {
+          mode: "branch-off",
+          newBranch: "long-agent-create",
+        },
+      },
+    },
+    {
+      label: "Git worktree options",
+      options: {
+        git: {
+          createWorktree: true,
+          worktreeSlug: "long-agent-create",
+        },
+      },
+    },
+    {
+      label: "legacy worktree name",
+      options: {
+        worktreeName: "long-agent-create",
+      },
+    },
+  ];
+
+  for (const [index, testCase] of cases.entries()) {
+    const requestId = `req-long-agent-create-${index}`;
+    const createPromise = client.createAgent({
+      provider: "codex",
+      cwd: "/tmp/project",
+      requestId,
+      ...testCase.options,
+    });
+    let settled = false;
+    void createPromise.then(
+      () => {
+        settled = true;
+        return undefined;
+      },
+      () => {
+        settled = true;
+        return undefined;
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(settled, testCase.label).toBe(false);
+
+    mock.triggerMessage(
+      wrapSessionMessage({
+        type: "status",
+        payload: {
+          status: "agent_create_failed",
+          requestId,
+          error: "agent deadline sentinel",
+        },
+      }),
+    );
+
+    await expect(createPromise, testCase.label).rejects.toThrow("agent deadline sentinel");
+  }
+});
+
+test("directory-backed createWorkspace retains the default client deadline", async () => {
+  useHeartbeatClock();
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const createPromise = client.createWorkspace(
+    {
+      source: {
+        kind: "directory",
+        path: "/tmp/project",
+      },
+    },
+    "req-directory-workspace-create",
+  );
+  let settled = false;
+  void createPromise.then(
+    () => {
+      settled = true;
+      return undefined;
+    },
+    () => {
+      settled = true;
+      return undefined;
+    },
+  );
+
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(settled).toBe(false);
+
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(createPromise).rejects.toThrow("Timeout waiting for message (60000ms)");
+});
+
 test("honors explicit fetchAgent timeout below the session RPC default", async () => {
   useHeartbeatClock();
   const logger = createMockLogger();
