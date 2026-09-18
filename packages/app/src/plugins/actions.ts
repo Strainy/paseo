@@ -13,6 +13,7 @@ import type { InstalledPlugin } from "./types";
 export interface PluginNavigation {
   openSettings(pluginId: string, screenId: string): void;
   openSurface(pluginId: string, surfaceId: string): void;
+  openWorkspace(input: { workspaceId: string; serverId?: string; agentId?: string }): void;
   openWorkspacePanel(pluginId: string, panelId: string, location: PluginPanelLocation): void;
   openAgentPanel(
     pluginId: string,
@@ -40,6 +41,9 @@ export function createPluginCapabilities(
         throw new Error(`Plugin surface is unavailable: ${surfaceId}`);
       }
       navigation.openSurface(plugin.id, surfaceId);
+    },
+    openWorkspace(input) {
+      navigation.openWorkspace(input);
     },
   };
 }

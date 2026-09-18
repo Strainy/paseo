@@ -79,6 +79,7 @@ export type PluginClientRuntime = Pick<
   | "rpc"
   | "openSettings"
   | "openSurface"
+  | "openWorkspace"
   | "openPanel"
   | "addComposerPill"
   | "addHeaderButton"
