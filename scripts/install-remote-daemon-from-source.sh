@@ -166,17 +166,6 @@ daemon_home="$(printf '%s' "$before_status" | node -e '
     process.stdout.write(value);
   });
 ')"
-daemon_listen="$(printf '%s' "$before_status" | node -e '
-  let input = "";
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", (chunk) => { input += chunk; });
-  process.stdin.on("end", () => {
-    const value = JSON.parse(input).listen;
-    if (typeof value !== "string" || value.length === 0) process.exit(1);
-    process.stdout.write(value);
-  });
-')"
-
 echo "Installing source packages with the remote npm prefix"
 npm install -g "$pack_dir"/*.tgz
 hash -r
@@ -187,7 +176,8 @@ if [[ "$installed_version" != "$expected_version" ]]; then
   exit 1
 fi
 
-paseo daemon restart --home "$daemon_home" --listen "$daemon_listen"
+paseo daemon stop --home "$daemon_home"
+PASEO_DESKTOP_MANAGED=0 paseo daemon start --home "$daemon_home"
 
 after_status=""
 for _ in {1..10}; do

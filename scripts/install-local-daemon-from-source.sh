@@ -95,13 +95,23 @@ daemon_identity() {
       }
 
       if (typeof status.home !== "string" || status.home.length === 0) process.exit(1);
-      if (typeof status.listen !== "string" || status.listen.length === 0) process.exit(1);
+      if (typeof status.configuredListen !== "string" || status.configuredListen.length === 0) {
+        process.exit(1);
+      }
+      if (
+        status.listen !== null &&
+        (typeof status.listen !== "string" || status.listen.length === 0)
+      ) {
+        process.exit(1);
+      }
+      if (status.localDaemon === "running" && status.listen === null) process.exit(1);
       if (status.pid !== null && typeof status.pid !== "number") process.exit(1);
       if (status.startedAt !== null && typeof status.startedAt !== "string") process.exit(1);
 
       process.stdout.write(JSON.stringify({
         home: status.home,
         listen: status.listen,
+        configuredListen: status.configuredListen,
         localDaemon: status.localDaemon,
         connectedDaemon: status.connectedDaemon,
         pid: status.pid,
@@ -208,7 +218,6 @@ before_status="$("$source_cli" daemon status --json)"
 before_identity="$(printf '%s' "$before_status" | daemon_identity)"
 daemon_home="$(identity_field "$before_identity" home)"
 daemon_state="$(identity_field "$before_identity" localDaemon)"
-daemon_listen="$(identity_field "$before_identity" listen)"
 require_daemon_password "$daemon_home" "$daemon_state"
 
 echo "Installing source packages with the current npm prefix"
@@ -235,13 +244,14 @@ fi
 require_daemon_password "$daemon_home" "$daemon_state"
 
 if [[ "$daemon_state" == "running" ]]; then
-  lifecycle_action="restart"
+  lifecycle_action="replacement"
+  "$paseo_cli" daemon stop --home "$daemon_home"
 else
   lifecycle_action="start"
 fi
 
 PASEO_DESKTOP_MANAGED=0 \
-  "$paseo_cli" daemon "$lifecycle_action" --home "$daemon_home" --listen "$daemon_listen"
+  "$paseo_cli" daemon start --home "$daemon_home"
 
 after_status=""
 for _ in {1..10}; do
