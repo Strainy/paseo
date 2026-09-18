@@ -33,6 +33,7 @@ function registry() {
         },
         openSurface: () => {},
         openSettings: () => {},
+        openWorkspace: () => {},
         openPanel: () => {},
         addComposerPill: () => ({ update() {}, remove() {} }),
         addHeaderButton: () => ({ update() {}, remove() {} }),

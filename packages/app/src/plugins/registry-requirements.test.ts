@@ -31,6 +31,7 @@ function registry(version: string) {
           cleanups++;
         },
         openSurface() {},
+        openWorkspace() {},
         openPanel() {},
         addComposerPill: () => ({ update() {}, remove() {} }),
         addHeaderButton: () => ({ update() {}, remove() {} }),

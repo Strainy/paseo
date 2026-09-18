@@ -186,6 +186,12 @@ export interface PluginCommandCapabilities {
   ): Promise<ZodOutput<OutputSchema>>;
   openSurface(id: string): void;
   openSettings(id: string): void;
+  /**
+   * Routes the user to a workspace, or to an agent inside it when `agentId` is
+   * set. `serverId` targets another host; the plugin installation's selected
+   * host is used when omitted.
+   */
+  openWorkspace(input: { workspaceId: string; serverId?: string; agentId?: string }): void;
 }
 
 export interface PluginGlobalCommandContext extends PluginCommandCapabilities {

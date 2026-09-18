@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import type { PluginPanelLocation } from "@getpaseo/plugin/client";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { buildPluginSurfaceRoute } from "./routes";
 import type { PluginNavigation } from "./actions";
 
@@ -25,6 +26,21 @@ export function createPluginNavigation(input: {
     },
     openSurface(pluginId, surfaceId) {
       router.push(buildPluginSurfaceRoute(serverId, pluginId, { kind: "surface", id: surfaceId }));
+    },
+    openWorkspace(target) {
+      const targetWorkspaceId = target.workspaceId.trim();
+      if (!targetWorkspaceId) throw new Error("openWorkspace requires a workspace id");
+      const targetServerId = target.serverId?.trim() || serverId;
+      const agentId = target.agentId?.trim();
+      if (agentId) {
+        navigateToAgent({
+          serverId: targetServerId,
+          agentId,
+          workspaceId: targetWorkspaceId,
+        });
+        return;
+      }
+      navigateToWorkspace({ serverId: targetServerId, workspaceId: targetWorkspaceId });
     },
     openWorkspacePanel(pluginId, panelId, location) {
       if (!workspaceId) throw new Error("No active workspace");
