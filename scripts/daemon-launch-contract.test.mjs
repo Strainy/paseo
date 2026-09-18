@@ -80,3 +80,18 @@ test("every executable daemon entrypoint enters the supervisor", async () => {
   assert.doesNotMatch(nixModule, /\bNODE_ENV\b\s*=/);
   assert.doesNotMatch(nixModule, /\bPASEO_NODE_ENV\b/);
 });
+
+test("source installers use the configured daemon lifecycle contract", async () => {
+  const [localInstaller, remoteInstaller] = await Promise.all([
+    readFile(join(repoRoot, "scripts/install-local-daemon-from-source.sh"), "utf8"),
+    readFile(join(repoRoot, "scripts/install-remote-daemon-from-source.sh"), "utf8"),
+  ]);
+
+  assert.match(localInstaller, /status\.configuredListen/);
+  assert.match(localInstaller, /"\$paseo_cli" daemon stop --home "\$daemon_home"/);
+  assert.match(localInstaller, /"\$paseo_cli" daemon start --home "\$daemon_home"/);
+  assert.doesNotMatch(localInstaller, /daemon (?:start|restart)[^\n]*--listen/);
+  assert.match(remoteInstaller, /paseo daemon stop --home "\$daemon_home"/);
+  assert.match(remoteInstaller, /paseo daemon start --home "\$daemon_home"/);
+  assert.doesNotMatch(remoteInstaller, /paseo daemon (?:start|restart)[^\n]*--listen/);
+});
