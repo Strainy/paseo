@@ -148,6 +148,7 @@ describe("plugin Command Center contributions", () => {
       navigation: {
         openSettings() {},
         openSurface() {},
+        openWorkspace() {},
         openWorkspacePanel() {},
         openAgentPanel() {},
       },
@@ -187,6 +188,7 @@ describe("plugin Command Center contributions", () => {
       receivedPaseo = context.paseo;
       rpcValue = (await context.rpc(inspect, { value: 4 })).value;
       context.openSurface("main");
+      context.openWorkspace({ workspaceId: "workspace-9", agentId: "agent-9" });
       context.openPanel("details", { location: "explorer" });
     });
     const runtime = createRuntime(installed);
@@ -200,6 +202,9 @@ describe("plugin Command Center contributions", () => {
         openSettings() {},
         openSurface(pluginId, surfaceId) {
           opened.push(`${pluginId}/surface/${surfaceId}`);
+        },
+        openWorkspace(input) {
+          opened.push(`workspace/${input.workspaceId}/${input.agentId ?? ""}`);
         },
         openWorkspacePanel(pluginId, panelId, location) {
           opened.push(`${pluginId}/workspace/${panelId}/${location}`);
@@ -217,7 +222,11 @@ describe("plugin Command Center contributions", () => {
 
     expect(rpcValue).toBe(5);
     expect(receivedPaseo).toBe(runtime.paseo);
-    expect(opened).toEqual(["review/surface/main", "review/agent/details/agent-1/explorer"]);
+    expect(opened).toEqual([
+      "review/surface/main",
+      "workspace/workspace-9/agent-9",
+      "review/agent/details/agent-1/explorer",
+    ]);
   });
 
   it("removes every contribution when its installation disappears", () => {
@@ -231,6 +240,7 @@ describe("plugin Command Center contributions", () => {
         navigation: {
           openSettings() {},
           openSurface() {},
+          openWorkspace() {},
           openWorkspacePanel() {},
           openAgentPanel() {},
         },

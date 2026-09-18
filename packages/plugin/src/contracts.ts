@@ -59,7 +59,6 @@ export interface PluginSidebarBadgeContribution {
   intervalMs?: number;
 }
 
-
 export interface PluginThemeColors {
   background: string;
   foreground: string;
