@@ -241,7 +241,7 @@ else
 fi
 
 PASEO_DESKTOP_MANAGED=0 \
-  "$paseo_cli" daemon "$lifecycle_action" --home "$daemon_home" --listen "$daemon_listen"
+  "$paseo_cli" daemon "$lifecycle_action" --home "$daemon_home"
 
 after_status=""
 for _ in {1..10}; do
