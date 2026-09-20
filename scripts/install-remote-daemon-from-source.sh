@@ -187,7 +187,7 @@ if [[ "$installed_version" != "$expected_version" ]]; then
   exit 1
 fi
 
-paseo daemon restart --home "$daemon_home" --listen "$daemon_listen"
+paseo daemon restart --home "$daemon_home"
 
 after_status=""
 for _ in {1..10}; do
