@@ -70,7 +70,8 @@ CLI is installed. Set `PASEO_PASSWORD` when daemon auth is configured. Use
 
 `install:remote-daemon` accepts an SSH config host or `user@host`. It builds the
 internal npm packages, installs them with the remote user's npm prefix, and
-restarts the existing remote daemon with its current home and listen address.
+starts the existing daemon with its configured home and listen address. A
+running daemon is fully stopped first so its supervisor loads the new packages.
 The remote host must already have Node.js, npm, and an npm-installed Paseo CLI.
 The task sources `~/.profile` before its preflight and installation commands.
 Configure the remote account's Node.js version manager there; interactive-only
