@@ -19,7 +19,11 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   exit 0
 fi
 
-if [[ $# -ne 0 ]]; then
+staged_install_dir=""
+if [[ "${1:-}" == "--install-staged" && $# -eq 2 ]]; then
+  # Internal: used only by the detached handoff below.
+  staged_install_dir="$2"
+elif [[ $# -ne 0 ]]; then
   usage >&2
   exit 2
 fi
@@ -114,13 +118,15 @@ replace_installed_app() {
     echo "The previous app is recoverable from $backup_app"
   fi
 
-  open "$target_app"
+  # open passes its caller's environment to the app, which would leak this
+  # task's variables (PASEO_AGENT_ID, MISE_*, tokens) into everything Paseo
+  # spawns. An empty environment gets the same launchd env as a Finder launch.
+  env -i /usr/bin/open "$target_app"
   echo "Opened Paseo"
 }
 
-# Set only for the detached handoff below.
-if [[ -n "${PASEO_MACOS_INSTALL_STAGE_DIR:-}" ]]; then
-  stage_dir="$PASEO_MACOS_INSTALL_STAGE_DIR"
+if [[ -n "$staged_install_dir" ]]; then
+  stage_dir="$staged_install_dir"
   if [[ "$stage_dir" != "$install_dir"/.paseo-source-install.* || ! -d "$stage_dir/Paseo.app" ]]; then
     echo "Unexpected staged app directory: $stage_dir" >&2
     exit 1
@@ -179,12 +185,16 @@ if paseo_app_is_ancestor; then
   # running this task. Finish from a new session outside Paseo's process tree.
   handoff_log="$HOME/Library/Logs/Paseo/source-install.log"
   mkdir -p "$(dirname -- "$handoff_log")"
-  PASEO_MACOS_INSTALL_STAGE_DIR="$stage_dir" node -e '
+  node -e '
     const { spawn } = require("node:child_process");
     const { openSync } = require("node:fs");
-    const log = openSync(process.argv[2], "a");
-    spawn(process.argv[1], { detached: true, stdio: ["ignore", log, log] }).unref();
-  ' "$repo_root/scripts/install-macos-from-source.sh" "$handoff_log"
+    const [script, logPath, stageDir] = process.argv.slice(1);
+    const log = openSync(logPath, "a");
+    spawn(script, ["--install-staged", stageDir], {
+      detached: true,
+      stdio: ["ignore", log, log],
+    }).unref();
+  ' "$repo_root/scripts/install-macos-from-source.sh" "$handoff_log" "$stage_dir"
   trap - EXIT
   echo "This task runs inside Paseo. Paseo will quit, install the new app, and reopen."
   echo "Installer log: $handoff_log"
