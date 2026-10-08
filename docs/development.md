@@ -58,9 +58,13 @@ reconciled before the build. When invoking the install scripts directly instead
 of through mise, run `mise exec -- npm ci` first in a fresh checkout and
 whenever dependencies change.
 
-`install:macos` builds and smoke-tests the native architecture, moves the
-existing `/Applications/Paseo.app` to the Trash, installs the new app, and opens
-it. Set `PASEO_MACOS_INSTALL_DIR` when the app lives elsewhere.
+`install:macos` builds and smoke-tests the native architecture, quits Paseo,
+moves the existing `/Applications/Paseo.app` to the Trash, installs the new app,
+and opens it. Set `PASEO_MACOS_INSTALL_DIR` when the app lives elsewhere. Run
+from a Paseo agent or terminal, the task hands the quit and install to a
+detached process and returns, because quitting Paseo stops the built-in daemon
+and ends that session. The detached process logs to
+`~/Library/Logs/Paseo/source-install.log`.
 
 `install:local-daemon` builds the internal npm packages, installs them with the
 current user's npm prefix, and starts or restarts the standalone daemon with its
