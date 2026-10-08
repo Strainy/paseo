@@ -132,7 +132,7 @@ fi
 echo "Transferring source packages to $ssh_target"
 scp "$pack_dir"/*.tgz "$ssh_target:$remote_dir/"
 
-echo "Installing and restarting the remote Paseo daemon"
+echo "Installing and starting the remote Paseo daemon"
 ssh "$ssh_target" /bin/bash -s -- "$remote_dir" "$expected_version" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
@@ -166,14 +166,29 @@ daemon_home="$(printf '%s' "$before_status" | node -e '
     process.stdout.write(value);
   });
 ')"
-daemon_listen="$(printf '%s' "$before_status" | node -e '
+daemon_state="$(printf '%s' "$before_status" | node -e '
   let input = "";
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk) => { input += chunk; });
   process.stdin.on("end", () => {
-    const value = JSON.parse(input).listen;
-    if (typeof value !== "string" || value.length === 0) process.exit(1);
-    process.stdout.write(value);
+    const status = JSON.parse(input);
+    if (status.desktopManaged !== false) {
+      console.error("install:remote-daemon cannot replace a desktop-managed daemon.");
+      process.exit(1);
+    }
+    if (status.localDaemon !== "running" && status.localDaemon !== "stopped") {
+      console.error(`Unexpected remote daemon state: ${status.localDaemon}`);
+      process.exit(1);
+    }
+    if (status.localDaemon === "running" && status.connectedDaemon !== "reachable") {
+      console.error("The remote daemon is running but could not be verified as reachable.");
+      process.exit(1);
+    }
+    if (typeof status.configuredListen !== "string" || status.configuredListen.length === 0) {
+      console.error("The remote daemon has no configured listen address.");
+      process.exit(1);
+    }
+    process.stdout.write(status.localDaemon);
   });
 ')"
 
@@ -183,14 +198,20 @@ hash -r
 
 installed_version="$(paseo --version)"
 if [[ "$installed_version" != "$expected_version" ]]; then
-  echo "Installed CLI version $installed_version does not match $expected_version; daemon was not restarted." >&2
+  echo "Installed CLI version $installed_version does not match $expected_version; daemon was not started." >&2
   exit 1
 fi
 
-paseo daemon restart --home "$daemon_home"
+if [[ "$daemon_state" == "running" ]]; then
+  paseo daemon stop --home "$daemon_home"
+fi
+PASEO_DESKTOP_MANAGED=0 paseo daemon start --home "$daemon_home"
 
 after_status=""
-for _ in {1..10}; do
+for retry_delay in 0 1 2 4 8; do
+  if [[ "$retry_delay" -gt 0 ]]; then
+    sleep "$retry_delay"
+  fi
   if after_status="$(paseo daemon status --home "$daemon_home" --json 2>/dev/null)" && \
     printf '%s' "$after_status" | node -e '
       let input = "";
@@ -199,7 +220,11 @@ for _ in {1..10}; do
       process.stdin.on("end", () => {
         const status = JSON.parse(input);
         process.exit(
-          status.localDaemon === "running" && status.connectedDaemon === "reachable" ? 0 : 1,
+          status.localDaemon === "running" &&
+          status.connectedDaemon === "reachable" &&
+          status.desktopManaged === false
+            ? 0
+            : 1,
         );
       });
     '
@@ -207,11 +232,10 @@ for _ in {1..10}; do
     break
   fi
   after_status=""
-  sleep 1
 done
 
 if [[ -z "$after_status" ]]; then
-  echo "The remote daemon did not become reachable after restart." >&2
+  echo "The remote daemon did not become reachable after start." >&2
   exit 1
 fi
 
