@@ -649,6 +649,7 @@ export const ptBR: TranslationResources = {
         copyTerminalId: "Copiar ID do terminal",
         copyFilePath: "Copiar caminho do arquivo",
         rename: "Renomear",
+        markAsUnread: "Marcar como não lido",
         closeAbove: "Fechar abas acima",
         closeBelow: "Fechar abas abaixo",
         closeLeft: "Fechar à esquerda",
@@ -698,6 +699,7 @@ export const ptBR: TranslationResources = {
         reloadingAgent: "Recarregando agente...",
         reloadedAgent: "Agente recarregado",
         failedToReloadAgent: "Falha ao recarregar agente",
+        failedToMarkAgentUnread: "Falha ao marcar agente como não lido",
         failedToCloseAgent: "Falha ao fechar agente",
       },
       confirmations: {

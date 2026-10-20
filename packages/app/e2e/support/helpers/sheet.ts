@@ -64,6 +64,24 @@ export async function replaceSheetFileText(
   await editor.pressSequentially(content);
 }
 
+/** Opens the compact tab switcher and waits for its sheet to finish rising. */
+export async function openTabSwitcher(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: /Switch tabs/ })
+    .filter({ visible: true })
+    .click();
+  const footer = page.getByRole("button", { name: "New terminal", exact: true });
+  await expect(footer).toBeVisible();
+  // Visibility alone passes while the sheet is still travelling up from below the viewport.
+  const viewportHeight = page.viewportSize()?.height ?? 0;
+  await expect
+    .poll(async () => {
+      const bounds = await footer.boundingBox();
+      return bounds ? bounds.y + bounds.height : Number.POSITIVE_INFINITY;
+    })
+    .toBeLessThanOrEqual(viewportHeight);
+}
+
 export async function selectTabFromSwitcher(page: Page, label: string): Promise<void> {
   await page
     .getByRole("button", { name: /Switch tabs/ })

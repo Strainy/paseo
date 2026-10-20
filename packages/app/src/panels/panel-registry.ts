@@ -20,6 +20,8 @@ export interface PanelDescriptor {
   titleState: "ready" | "loading";
   icon: ComponentType<PanelIconProps>;
   statusBucket: SidebarStateBucket | null;
+  /** Agent panels: the agent is finished and the user has read it, so it can be marked unread. */
+  isFinishedAndRead?: boolean;
 }
 
 export interface PanelDescriptorContext {

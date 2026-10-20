@@ -365,4 +365,136 @@ describe("buildWorkspaceTabMenuEntries", () => {
     expect(agentSeparator?.key).toBe("rename-separator");
     expect(terminalSeparator?.key).toBe("rename-separator");
   });
+
+  it("offers Mark as unread right after Rename when the agent can be marked unread", () => {
+    const onMarkAgentUnread = vi.fn();
+    const sharedInput = {
+      tab: createAgentTab(),
+      index: 1,
+      tabCount: 3,
+      onCopyResumeCommand: vi.fn(),
+      onCopyAgentId: vi.fn(),
+      onCopyTerminalId: vi.fn(),
+      onCopyFilePath: vi.fn(),
+      onReloadAgent: vi.fn(),
+      onRenameTab: vi.fn(),
+      onMarkAgentUnread,
+      onCloseTab: vi.fn(),
+      onCloseTabsBefore: vi.fn(),
+      onCloseTabsAfter: vi.fn(),
+      onCloseOtherTabs: vi.fn(),
+    };
+
+    const desktopEntries = buildWorkspaceTabMenuEntries({
+      ...sharedInput,
+      surface: "desktop",
+      menuTestIDBase: "workspace-tab-context-agent_123",
+    });
+    const mobileEntries = buildWorkspaceTabMenuEntries({
+      ...sharedInput,
+      surface: "mobile",
+      menuTestIDBase: "workspace-tab-menu-agent_123",
+    });
+
+    for (const [entries, testID] of [
+      [desktopEntries, "workspace-tab-context-agent_123-mark-unread"],
+      [mobileEntries, "workspace-tab-menu-agent_123-mark-unread"],
+    ] as const) {
+      const keys = entries.map((entry) => entry.key);
+      const renameIndex = keys.indexOf("rename");
+      expect(keys.slice(renameIndex, renameIndex + 3)).toEqual([
+        "rename",
+        "mark-unread",
+        "rename-separator",
+      ]);
+      expect(entries).toContainEqual(
+        expect.objectContaining({
+          kind: "item",
+          key: "mark-unread",
+          label: "Mark as unread",
+          icon: "circle",
+          testID,
+        }),
+      );
+    }
+
+    const markUnreadEntry = desktopEntries.find((entry) => entry.key === "mark-unread");
+    if (!markUnreadEntry || markUnreadEntry.kind !== "item") {
+      throw new Error("Mark as unread entry missing");
+    }
+    markUnreadEntry.onSelect();
+    expect(onMarkAgentUnread).toHaveBeenCalledExactlyOnceWith("agent-123");
+  });
+
+  it("offers Mark as unread only for agent tabs", () => {
+    const tabs: WorkspaceTabDescriptor[] = [
+      {
+        key: "terminal_abc",
+        tabId: "terminal_abc",
+        kind: "terminal",
+        target: { kind: "terminal", terminalId: "terminal-abc" },
+      },
+      {
+        key: "file_abc",
+        tabId: "file_abc",
+        kind: "file",
+        target: { kind: "file", path: "/some/path.ts", lineStart: 1, lineEnd: 10 },
+      },
+      {
+        key: "draft_123",
+        tabId: "draft_123",
+        kind: "draft",
+        target: { kind: "draft", draftId: "draft_123" },
+      },
+    ];
+
+    for (const tab of tabs) {
+      const entries = buildWorkspaceTabMenuEntries({
+        surface: "desktop",
+        tab,
+        index: 0,
+        tabCount: 1,
+        menuTestIDBase: `workspace-tab-context-${tab.tabId}`,
+        onCopyResumeCommand: vi.fn(),
+        onCopyAgentId: vi.fn(),
+        onCopyTerminalId: vi.fn(),
+        onCopyFilePath: vi.fn(),
+        onReloadAgent: vi.fn(),
+        onRenameTab: vi.fn(),
+        onMarkAgentUnread: vi.fn(),
+        onCloseTab: vi.fn(),
+        onCloseTabsBefore: vi.fn(),
+        onCloseTabsAfter: vi.fn(),
+        onCloseOtherTabs: vi.fn(),
+      });
+
+      expect(entries.some((entry) => entry.key === "mark-unread")).toBe(false);
+    }
+  });
+
+  it("passes Mark as unread through the desktop tab actions", () => {
+    const actions = buildWorkspaceDesktopTabActions({
+      tab: createAgentTab(),
+      index: 0,
+      tabCount: 1,
+      onCopyResumeCommand: vi.fn(),
+      onCopyAgentId: vi.fn(),
+      onCopyTerminalId: vi.fn(),
+      onCopyFilePath: vi.fn(),
+      onReloadAgent: vi.fn(),
+      onRenameTab: vi.fn(),
+      onMarkAgentUnread: vi.fn(),
+      onCloseTab: vi.fn(),
+      onCloseTabsToLeft: vi.fn(),
+      onCloseTabsToRight: vi.fn(),
+      onCloseOtherTabs: vi.fn(),
+    });
+
+    expect(actions.menuEntries).toContainEqual(
+      expect.objectContaining({
+        key: "mark-unread",
+        testID: "workspace-tab-context-agent_123-mark-unread",
+      }),
+    );
+  });
 });

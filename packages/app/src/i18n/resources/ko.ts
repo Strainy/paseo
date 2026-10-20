@@ -645,6 +645,7 @@ export const ko: TranslationResources = {
         copyTerminalId: "터미널 ID 복사",
         copyFilePath: "파일 경로 복사",
         rename: "이름 변경",
+        markAsUnread: "읽지 않음으로 표시",
         closeAbove: "위쪽 탭 닫기",
         closeBelow: "아래쪽 탭 닫기",
         closeLeft: "왼쪽 탭 닫기",
@@ -695,6 +696,7 @@ export const ko: TranslationResources = {
         reloadingAgent: "에이전트 다시 로드 중...",
         reloadedAgent: "에이전트를 다시 로드했습니다",
         failedToReloadAgent: "에이전트를 다시 로드하지 못했습니다",
+        failedToMarkAgentUnread: "에이전트를 읽지 않음으로 표시하지 못했습니다",
         failedToCloseAgent: "에이전트를 닫지 못했습니다",
       },
       confirmations: {

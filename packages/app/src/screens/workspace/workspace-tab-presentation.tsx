@@ -30,6 +30,8 @@ export interface WorkspaceTabPresentation {
   titleState: "ready" | "loading";
   icon: React.ComponentType<PanelIconProps>;
   statusBucket: SidebarStateBucket | null;
+  /** Set for agent tabs, from their panel descriptor. */
+  isFinishedAndRead?: boolean;
 }
 
 const DEFAULT_STATUS_DOT_OFFSET = -2;
@@ -95,8 +97,10 @@ function WorkspaceTabPresentationResolverInner({
       titleState: descriptor.titleState,
       icon: descriptor.icon,
       statusBucket: descriptor.statusBucket,
+      isFinishedAndRead: descriptor.isFinishedAndRead,
     }),
     [
+      descriptor.isFinishedAndRead,
       descriptor.icon,
       descriptor.label,
       descriptor.tooltip,
@@ -179,7 +183,9 @@ export function WorkspaceTabIcon({
           <StatusRing backdrop={backdrop} />
         </View>
       ) : null}
-      {statusDotColor ? <View style={statusDotStyle} /> : null}
+      {statusDotColor ? (
+        <View style={statusDotStyle} testID={`workspace-tab-status-indicator-${bucket}`} />
+      ) : null}
       {showNeedsInputAlert ? (
         <View style={styles.statusAlertOverlay}>
           <ThemedCircleAlert size={STATUS_INDICATOR_ALERT_SIZE} uniProps={needsInputAlertMapping} />
@@ -195,6 +201,7 @@ interface WorkspaceTabOptionRowProps {
   active: boolean;
   onPress: () => void;
   trailingAccessory?: ReactNode;
+  testID?: string;
 }
 
 export function WorkspaceTabOptionRow({
@@ -203,6 +210,7 @@ export function WorkspaceTabOptionRow({
   active,
   onPress,
   trailingAccessory,
+  testID,
 }: WorkspaceTabOptionRowProps): ReactElement {
   const { t } = useTranslation();
   const isOptionActive = useCallback(
@@ -222,7 +230,7 @@ export function WorkspaceTabOptionRow({
     [active],
   );
   return (
-    <View style={optionRowStyle}>
+    <View style={optionRowStyle} testID={testID}>
       <Pressable onPress={onPress} style={pressableStyle}>
         {(state) => {
           const optionActive = isOptionActive(state);

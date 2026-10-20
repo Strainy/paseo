@@ -11,6 +11,7 @@ export interface WorkspaceTabMenuLabels {
   copyTerminalId: string;
   copyFilePath: string;
   rename: string;
+  markAsUnread: string;
   closeAbove: string;
   closeBelow: string;
   closeLeft: string;
@@ -27,6 +28,7 @@ export const DEFAULT_WORKSPACE_TAB_MENU_LABELS: WorkspaceTabMenuLabels = {
   copyTerminalId: i18n.t("workspace.tabs.menu.copyTerminalId"),
   copyFilePath: i18n.t("workspace.tabs.menu.copyFilePath"),
   rename: i18n.t("workspace.tabs.menu.rename"),
+  markAsUnread: i18n.t("workspace.tabs.menu.markAsUnread"),
   closeAbove: i18n.t("workspace.tabs.menu.closeAbove"),
   closeBelow: i18n.t("workspace.tabs.menu.closeBelow"),
   closeLeft: i18n.t("workspace.tabs.menu.closeLeft"),
@@ -47,6 +49,7 @@ export type WorkspaceTabMenuEntry =
         | "rotate-cw"
         | "arrow-left-to-line"
         | "arrow-right-to-line"
+        | "circle"
         | "copy-x"
         | "pencil"
         | "x";
@@ -74,6 +77,8 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  /** Present only when the tab's agent can be marked unread. */
+  onMarkAgentUnread?: (agentId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsBefore: (tabId: string) => Promise<void> | void;
   onCloseTabsAfter: (tabId: string) => Promise<void> | void;
@@ -91,6 +96,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  onMarkAgentUnread?: (agentId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
@@ -178,6 +184,7 @@ export function buildWorkspaceTabMenuEntries(
     onCopyFilePath,
     onReloadAgent,
     onRenameTab,
+    onMarkAgentUnread,
     onCloseTab,
     onCloseTabsBefore,
     onCloseTabsAfter,
@@ -254,6 +261,17 @@ export function buildWorkspaceTabMenuEntries(
         onRenameTab(tab);
       },
     });
+    if (tab.target.kind === "agent" && onMarkAgentUnread) {
+      const { agentId } = tab.target;
+      entries.push({
+        kind: "item",
+        key: "mark-unread",
+        label: labels.markAsUnread,
+        icon: "circle",
+        testID: `${menuTestIDBase}-mark-unread`,
+        onSelect: () => onMarkAgentUnread(agentId),
+      });
+    }
     entries.push({
       kind: "separator",
       key: "rename-separator",
@@ -339,6 +357,7 @@ export function buildWorkspaceDesktopTabActions(
       onCopyFilePath: input.onCopyFilePath,
       onReloadAgent: input.onReloadAgent,
       onRenameTab: input.onRenameTab,
+      onMarkAgentUnread: input.onMarkAgentUnread,
       onCloseTab: input.onCloseTab,
       onCloseTabsBefore: input.onCloseTabsToLeft,
       onCloseTabsAfter: input.onCloseTabsToRight,

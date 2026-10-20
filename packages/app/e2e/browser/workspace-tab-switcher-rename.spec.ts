@@ -4,23 +4,11 @@ import { test, expect } from "../support/fixtures";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { renameModalInput, renameModalSubmit } from "../support/helpers/rename";
 import type { SeedDaemonClient } from "../support/helpers/seed-client";
+import { openTabSwitcher } from "../support/helpers/sheet";
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 
 test.use({ viewport: MOBILE_VIEWPORT, deviceScaleFactor: 2 });
-
-async function openTabSwitcher(page: Page) {
-  await page.getByRole("button", { name: /Switch tabs/ }).click();
-  const footer = page.getByRole("button", { name: "New terminal", exact: true });
-  await expect(footer).toBeVisible();
-  // Visibility alone passes while the sheet is still travelling up from below the viewport.
-  await expect
-    .poll(async () => {
-      const bounds = await footer.boundingBox();
-      return bounds ? bounds.y + bounds.height : Number.POSITIVE_INFINITY;
-    })
-    .toBeLessThanOrEqual(MOBILE_VIEWPORT.height);
-}
 
 async function captureScreen(page: Page, testInfo: TestInfo, name: string) {
   await page.screenshot({ path: testInfo.outputPath(name + ".png") });
