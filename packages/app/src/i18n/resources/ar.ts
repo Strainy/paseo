@@ -650,6 +650,7 @@ export const ar: TranslationResources = {
         copyTerminalId: "نسخ معرف المحطة",
         copyFilePath: "Copy file path",
         rename: "إعادة تسمية",
+        markAsUnread: "وضع علامة كغير مقروء",
         closeAbove: "إغلاق علامات التبويب أعلاه",
         closeBelow: "إغلاق علامات التبويب أدناه",
         closeLeft: "بالقرب من اليسار",
@@ -699,6 +700,7 @@ export const ar: TranslationResources = {
         reloadingAgent: "وكيل إعادة التحميل...",
         reloadedAgent: "وكيل إعادة تحميل",
         failedToReloadAgent: "فشل في إعادة تحميل الوكيل",
+        failedToMarkAgentUnread: "فشل في وضع علامة على الوكيل كغير مقروء",
         failedToCloseAgent: "فشل في إغلاق الوكيل",
       },
       confirmations: {

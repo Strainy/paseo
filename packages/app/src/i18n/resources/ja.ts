@@ -656,6 +656,7 @@ export const ja: TranslationResources = {
         copyTerminalId: "ターミナルIDをコピー",
         copyFilePath: "ファイルパスをコピー",
         rename: "名前を変更",
+        markAsUnread: "未読にする",
         closeAbove: "上のタブを閉じる",
         closeBelow: "下のタブを閉じる",
         closeLeft: "左のタブを閉じる",
@@ -706,6 +707,7 @@ export const ja: TranslationResources = {
         reloadingAgent: "エージェントを再読み込み中...",
         reloadedAgent: "エージェントを再読み込みしました",
         failedToReloadAgent: "エージェントの再読み込みに失敗しました",
+        failedToMarkAgentUnread: "エージェントを未読にできませんでした",
         failedToCloseAgent: "エージェントを閉じられませんでした",
       },
       confirmations: {

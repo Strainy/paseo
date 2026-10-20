@@ -2396,12 +2396,19 @@ export class AgentManager {
   }
 
   async markAgentUnread(agentId: string): Promise<void> {
+    await this.runLifecycleMutation(agentId, () => this.markAgentUnreadUnlocked(agentId));
+  }
+
+  private async markAgentUnreadUnlocked(agentId: string): Promise<void> {
     const liveAgent = this.agents.get(agentId);
     if (liveAgent) {
       const isFinished = liveAgent.lifecycle === "idle";
       const hasPendingPermissions = liveAgent.pendingPermissions.size > 0;
       const canMarkUnread =
-        isFinished && !liveAgent.attention.requiresAttention && !hasPendingPermissions;
+        !liveAgent.internal &&
+        isFinished &&
+        !liveAgent.attention.requiresAttention &&
+        !hasPendingPermissions;
       if (!canMarkUnread) {
         throw new Error(`Agent is no longer finished and read: ${agentId}`);
       }

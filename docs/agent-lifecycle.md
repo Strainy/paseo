@@ -285,9 +285,14 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
-A finished workspace can be marked unread after it has been reviewed. The daemon restores
-`finished` attention on its newest eligible workspace-root agent without sending a new completion
-notification. Opening the workspace clears that attention through the normal focus flow.
+A finished workspace, or a single finished agent from its tab menu, can be marked unread after it
+has been reviewed. The daemon restores `finished` attention without sending a new completion
+notification: on the workspace's newest eligible workspace-root agent, or on the chosen agent. It
+rejects an agent that is busy or already unread. Opening the workspace or the tab clears that
+attention through the normal focus flow. Attention that arrives while an agent is on screen is
+cleared when the user switches away. Marking the workspace parks pane focus first so that clear
+cannot run; marking a tab records the mark in the app, and the next blur of that agent skips its
+clear (`packages/app/src/workspace/mark-unread.ts`).
 
 Attention is set by the agent finishing or failing and cleared by the client's
 `workspace.clear_attention`, which fires when the user reads the chat. Loading an agent's runtime is

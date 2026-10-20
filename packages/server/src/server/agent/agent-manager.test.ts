@@ -5759,6 +5759,98 @@ test("markAgentUnread dispatches stored attention to every subscriber", async ()
   });
 });
 
+test("markAgentUnread sets finished attention on a live idle agent", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-mark-unread-live-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  const created = await manager.createAgent(
+    { provider: "codex", cwd: workdir, title: "Live unread" },
+    undefined,
+    { workspaceId: "workspace-1" },
+  );
+  expect(manager.getAgent(created.id)?.lifecycle).toBe("idle");
+
+  const events: ManagedAgent[] = [];
+  manager.subscribe(
+    (event) => {
+      if (event.type === "agent_state" && event.agent.id === created.id) {
+        events.push(event.agent);
+      }
+    },
+    { replayState: false },
+  );
+
+  await manager.markAgentUnread(created.id);
+
+  expect(manager.getAgent(created.id)?.attention).toEqual({
+    requiresAttention: true,
+    attentionReason: "finished",
+    attentionTimestamp: expect.any(Date),
+  });
+  expect(events.at(-1)?.attention).toMatchObject({
+    requiresAttention: true,
+    attentionReason: "finished",
+  });
+  expect(await storage.get(created.id)).toMatchObject({
+    requiresAttention: true,
+    attentionReason: "finished",
+  });
+  await expect(manager.markAgentUnread(created.id)).rejects.toThrow(
+    `Agent is no longer finished and read: ${created.id}`,
+  );
+});
+
+test("markAgentUnread waits for a concurrent archive instead of unarchiving the agent", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-mark-unread-archive-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  const created = await manager.createAgent(
+    { provider: "codex", cwd: workdir, title: "Archived while marking" },
+    undefined,
+    { workspaceId: "workspace-1" },
+  );
+  await manager.closeAgent(created.id);
+
+  const archive = manager.archiveSnapshot(created.id, new Date().toISOString());
+  const mark = manager.markAgentUnread(created.id);
+
+  await archive;
+  await expect(mark).rejects.toThrow(`Agent is no longer finished and read: ${created.id}`);
+  expect(await storage.get(created.id)).toMatchObject({
+    archivedAt: expect.any(String),
+    requiresAttention: false,
+  });
+});
+
+test("markAgentUnread rejects a live internal agent", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-mark-unread-internal-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  const created = await manager.createAgent(
+    { provider: "codex", cwd: workdir, title: "Internal unread", internal: true },
+    undefined,
+    { workspaceId: undefined },
+  );
+  expect(manager.getAgent(created.id)?.lifecycle).toBe("idle");
+
+  await expect(manager.markAgentUnread(created.id)).rejects.toThrow(
+    `Agent is no longer finished and read: ${created.id}`,
+  );
+  expect(manager.getAgent(created.id)?.attention.requiresAttention).toBe(false);
+});
+
 test("reloadAgentSession cancels active run and resumes existing session once thread_started is observed", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-reload-active-"));
   const storagePath = join(workdir, "agents");
