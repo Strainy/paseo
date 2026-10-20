@@ -18,6 +18,7 @@ interface StatusIconProps {
   statusBucket: SidebarStateBucket | null;
   size?: number;
   statusDotBorderColor?: string;
+  statusDotTestID?: string;
   backdrop: SurfaceBackdrop;
 }
 const DEFAULT_STATUS_DOT_OFFSET = -2;
@@ -33,6 +34,7 @@ export function StatusIcon({
   statusBucket,
   size = 14,
   statusDotBorderColor,
+  statusDotTestID,
   backdrop,
 }: StatusIconProps): ReactElement {
   const bucket = statusBucket;
@@ -68,7 +70,7 @@ export function StatusIcon({
           <StatusRing backdrop={backdrop} />
         </View>
       ) : null}
-      {statusDotColor ? <View style={statusDotStyle} /> : null}
+      {statusDotColor ? <View style={statusDotStyle} testID={statusDotTestID} /> : null}
       {showNeedsInputAlert ? (
         <View style={styles.statusAlertOverlay}>
           <ThemedCircleAlert size={STATUS_INDICATOR_ALERT_SIZE} uniProps={needsInputAlertMapping} />

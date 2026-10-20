@@ -42,6 +42,7 @@ export function useAgentDescriptor(
         provider: agent?.provider ?? "codex",
         title: agent?.title ?? null,
         status: agent?.status ?? null,
+        isArchived: Boolean(agent?.archivedAt),
         pendingPermissionCount: agent?.pendingPermissions.length ?? 0,
         requiresAttention: agent?.requiresAttention ?? false,
         attentionReason: agent?.attentionReason ?? null,
@@ -57,6 +58,7 @@ export function buildAgentDescriptor(input: {
   provider: Agent["provider"];
   title: string | null;
   status: Agent["status"] | null;
+  isArchived: boolean;
   pendingPermissionCount: number;
   requiresAttention: boolean;
   attentionReason: Agent["attentionReason"];
@@ -80,5 +82,13 @@ export function buildAgentDescriptor(input: {
           attentionReason: input.attentionReason,
         })
       : null,
+    // Mirrors the daemon's mark-unread precondition. The "done" status bucket also covers
+    // initializing agents, so it cannot stand in for this.
+    isFinishedAndRead:
+      (input.status === "idle" || input.status === "closed") &&
+      !input.isArchived &&
+      !input.requiresAttention &&
+      input.pendingPermissionCount === 0 &&
+      !input.isTurnActive,
   };
 }

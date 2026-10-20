@@ -16,6 +16,7 @@ import {
   CopyX,
   ArrowLeftToLine,
   ArrowRightToLine,
+  Circle,
   Copy,
   Pencil,
   RotateCw,
@@ -92,6 +93,7 @@ import {
   useHorizontalScrollBoundary,
 } from "@/components/ui/horizontal-scroll-boundary";
 import { useSessionStore } from "@/stores/session-store";
+import { useMarkAgentUnreadAction } from "@/hooks/use-mark-agent-unread-action";
 
 const DROPDOWN_WIDTH = 220;
 const DEFAULT_INLINE_ADD_BUTTON_RESERVED_WIDTH = 36;
@@ -128,6 +130,7 @@ const ThemedCopy = withUnistyles(Copy);
 const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
 const ThemedArrowRightToLine = withUnistyles(ArrowRightToLine);
+const ThemedCircle = withUnistyles(Circle);
 const ThemedCopyX = withUnistyles(CopyX);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedPlus = withUnistyles(Plus);
@@ -430,6 +433,8 @@ function TabContextMenuItem({
         return <ThemedArrowLeftToLine size={16} uniProps={mutedColorMapping} />;
       case "arrow-right-to-line":
         return <ThemedArrowRightToLine size={16} uniProps={mutedColorMapping} />;
+      case "circle":
+        return <ThemedCircle size={16} uniProps={mutedColorMapping} />;
       case "copy-x":
         return <ThemedCopyX size={16} uniProps={mutedColorMapping} />;
       case "pencil":
@@ -1055,6 +1060,7 @@ function ResolvedWorkspaceDesktopTabsRow({
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const newTabKeys = useShortcutKeys("workspace-tab-new");
+  const onMarkAgentUnread = useMarkAgentUnreadAction(normalizedServerId);
   const [tabsContainerWidth, setTabsContainerWidth] = useState<number>(0);
   const tabsScrollRef = useRef<ScrollView>(null);
   const [exitFocusModeWidth, setExitFocusModeWidth] = useState<number>(0);
@@ -1116,6 +1122,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       copyTerminalId: t("workspace.tabs.menu.copyTerminalId"),
       copyFilePath: t("workspace.tabs.menu.copyFilePath"),
       rename: t("workspace.tabs.menu.rename"),
+      markAsUnread: t("workspace.tabs.menu.markAsUnread"),
       closeAbove: t("workspace.tabs.menu.closeAbove"),
       closeBelow: t("workspace.tabs.menu.closeBelow"),
       closeLeft: t("workspace.tabs.menu.closeLeft"),
@@ -1308,6 +1315,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           onCopyFilePath={onCopyFilePath}
           onReloadAgent={onReloadAgent}
           onRenameTab={onRenameTab}
+          onMarkAgentUnread={item.presentation.isFinishedAndRead ? onMarkAgentUnread : undefined}
           onCloseTabsToLeft={onCloseTabsToLeft}
           onCloseTabsToRight={onCloseTabsToRight}
           onCloseOtherTabs={onCloseOtherTabs}
@@ -1340,6 +1348,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       onCopyTerminalId,
       onCopyFilePath,
       onCopyResumeCommand,
+      onMarkAgentUnread,
       onNavigateTab,
       onReloadAgent,
       onRenameTab,
@@ -1466,6 +1475,7 @@ function ResolvedDesktopTabChip({
   onCopyFilePath,
   onReloadAgent,
   onRenameTab,
+  onMarkAgentUnread,
   onCloseTabsToLeft,
   onCloseTabsToRight,
   onCloseOtherTabs,
@@ -1494,6 +1504,7 @@ function ResolvedDesktopTabChip({
   onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  onMarkAgentUnread: ((agentId: string) => void) | undefined;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
@@ -1523,6 +1534,7 @@ function ResolvedDesktopTabChip({
         onCopyFilePath,
         onReloadAgent,
         onRenameTab,
+        onMarkAgentUnread,
         onCloseTab,
         onCloseTabsToLeft,
         onCloseTabsToRight,
@@ -1541,6 +1553,7 @@ function ResolvedDesktopTabChip({
       onCopyFilePath,
       onCopyResumeCommand,
       labels,
+      onMarkAgentUnread,
       onReloadAgent,
       onRenameTab,
       tabCount,

@@ -647,6 +647,7 @@ export const en = {
         copyTerminalId: "Copy terminal id",
         copyFilePath: "Copy file path",
         rename: "Rename",
+        markAsUnread: "Mark as unread",
         closeAbove: "Close tabs above",
         closeBelow: "Close tabs below",
         closeLeft: "Close to the left",
@@ -696,6 +697,7 @@ export const en = {
         reloadingAgent: "Reloading agent...",
         reloadedAgent: "Reloaded agent",
         failedToReloadAgent: "Failed to reload agent",
+        failedToMarkAgentUnread: "Failed to mark agent as unread",
         failedToCloseAgent: "Failed to close agent",
       },
       confirmations: {

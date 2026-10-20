@@ -657,6 +657,7 @@ export const ru: TranslationResources = {
         copyTerminalId: "Скопировать идентификатор терминала",
         copyFilePath: "Скопировать путь к файлу",
         rename: "Переименовать",
+        markAsUnread: "Отметить как непрочитанное",
         closeAbove: "Закрыть вкладки выше",
         closeBelow: "Закрыть вкладки ниже",
         closeLeft: "Закрыть вкладки слева",
@@ -706,6 +707,7 @@ export const ru: TranslationResources = {
         reloadingAgent: "Перезагрузка агента...",
         reloadedAgent: "Агент перезагружен",
         failedToReloadAgent: "Не удалось перезагрузить агента",
+        failedToMarkAgentUnread: "Не удалось отметить агента как непрочитанного",
         failedToCloseAgent: "Не удалось закрыть агента",
       },
       confirmations: {
