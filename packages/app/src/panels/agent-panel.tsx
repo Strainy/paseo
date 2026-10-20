@@ -763,6 +763,7 @@ function ChatAgentContent({
     hasAppliedAuthoritativeHistory || replicaTimelineStatus === "painted";
 
   const attentionController = useAgentAttentionClear({
+    serverId,
     agentId,
     client,
     isConnected,

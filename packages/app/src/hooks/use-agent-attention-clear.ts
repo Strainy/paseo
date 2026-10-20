@@ -7,10 +7,12 @@ import {
 } from "@/utils/agent-attention";
 import { getIsAppActivelyVisible } from "@/utils/app-visibility";
 import { isWeb } from "@/constants/platform";
+import { consumeManualUnreadMark } from "@/workspace/mark-unread";
 
 type AttentionReason = "finished" | "error" | "permission" | null | undefined;
 
 interface UseAgentAttentionClearParams {
+  serverId: string;
   agentId: string | null | undefined;
   client: DaemonClient | null;
   isConnected: boolean;
@@ -26,6 +28,7 @@ interface AgentAttentionClearController {
 }
 
 export function useAgentAttentionClear({
+  serverId,
   agentId,
   client,
   isConnected,
@@ -59,9 +62,16 @@ export function useAgentAttentionClear({
         return;
       }
       deferredFocusEntryClearRef.current = false;
+      if (
+        trigger === "agent-blur" &&
+        consumeManualUnreadMark({ serverId, agentId: resolvedAgentId })
+      ) {
+        // The user marked the agent unread while viewing it. Keep it for their next visit.
+        return;
+      }
       client.clearAgentAttention(resolvedAgentId).catch(() => {});
     },
-    [agentId, attentionReason, client, isConnected, requiresAttention],
+    [agentId, attentionReason, client, isConnected, requiresAttention, serverId],
   );
 
   useEffect(() => {
@@ -96,6 +106,14 @@ export function useAgentAttentionClear({
   }, [requiresAttention]);
 
   useEffect(() => {
+    const resolvedAgentId = agentId?.trim();
+    if (!requiresAttention && resolvedAgentId) {
+      // Read again, so a later blur clears attention as usual.
+      consumeManualUnreadMark({ serverId, agentId: resolvedAgentId });
+    }
+  }, [agentId, requiresAttention, serverId]);
+
+  useEffect(() => {
     const isActivelyViewed = isScreenFocused && isAppVisible;
     if (
       !prevRequiresAttentionRef.current &&
@@ -113,13 +131,18 @@ export function useAgentAttentionClear({
     const enteredScreenFocus = !prevScreenFocusedRef.current && isScreenFocused && isAppVisible;
     const resumedIntoFocusedAgent = !prevAppVisibleRef.current && isAppVisible && isScreenFocused;
 
+    const resolvedAgentId = agentId?.trim();
+    if (enteredScreenFocus && resolvedAgentId) {
+      // Opening the agent reads any earlier mark; only a mark made during this visit outlives it.
+      consumeManualUnreadMark({ serverId, agentId: resolvedAgentId });
+    }
     if (enteredScreenFocus || resumedIntoFocusedAgent) {
       clearAttention("focus-entry");
     }
 
     prevScreenFocusedRef.current = isScreenFocused;
     prevAppVisibleRef.current = isAppVisible;
-  }, [clearAttention, isAppVisible, isScreenFocused]);
+  }, [agentId, clearAttention, isAppVisible, isScreenFocused, serverId]);
 
   return {
     clearOnInputFocus: useCallback(() => {
