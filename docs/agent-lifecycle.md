@@ -335,11 +335,12 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
-A finished or failed workspace can be marked unread after it has been reviewed. The daemon restores
-attention on its newest eligible workspace-root agent, `error` for an agent whose lifecycle is
-`error` and `finished` otherwise, without sending a new notification. Opening a workspace restores
-its selected tab; attention on another agent remains unread until that agent is focused or the
-workspace is explicitly marked read.
+A finished or failed workspace, or a single finished agent from its tab menu, can be marked unread
+after it has been reviewed. The daemon restores attention without sending a new notification,
+`error` for an agent whose lifecycle is `error` and `finished` otherwise: on the workspace's newest
+eligible workspace-root agent, or on the chosen agent. It rejects an agent that is busy or already
+unread. Opening a workspace restores its selected tab; attention on another agent remains unread
+until that agent is focused or the workspace is explicitly marked read.
 
 Attention is set by the agent finishing or failing and acknowledged by deliberate focus or
 interaction with its chat, including repeat clicks in an already focused pane. A completion

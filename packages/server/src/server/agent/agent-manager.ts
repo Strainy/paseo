@@ -2785,12 +2785,19 @@ export class AgentManager {
   }
 
   async markAgentUnread(agentId: string): Promise<void> {
+    await this.runLifecycleMutation(agentId, () => this.markAgentUnreadUnlocked(agentId));
+  }
+
+  private async markAgentUnreadUnlocked(agentId: string): Promise<void> {
     const liveAgent = this.agents.get(agentId);
     if (liveAgent) {
       const attentionReason = unreadAttentionReason(liveAgent.lifecycle);
       const hasPendingPermissions = liveAgent.pendingPermissions.size > 0;
       const canMarkUnread =
-        attentionReason && !liveAgent.attention.requiresAttention && !hasPendingPermissions;
+        !liveAgent.internal &&
+        attentionReason &&
+        !liveAgent.attention.requiresAttention &&
+        !hasPendingPermissions;
       if (!canMarkUnread) {
         throw new Error(`Agent is no longer settled and read: ${agentId}`);
       }

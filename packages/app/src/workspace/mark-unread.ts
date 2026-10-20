@@ -24,3 +24,13 @@ export async function markWorkspaceUnread(serverId: string, workspaceId: string)
     throw error;
   }
 }
+
+export async function markAgentUnread(serverId: string, agentId: string): Promise<void> {
+  const client = getHostRuntimeStore().getClient(serverId);
+  if (!client) {
+    throw new Error(i18n.t("workspace.terminal.hostDisconnected"));
+  }
+  // Attention that lands while its agent is on screen stays unread until the next deliberate
+  // focus, so a mark on the visible tab needs no pane unfocus like the workspace mark does.
+  await client.markAgentUnread(agentId);
+}

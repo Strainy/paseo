@@ -19,6 +19,7 @@ import {
   type WorkspaceTabMenuLabels,
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { useMarkAgentUnreadAction } from "@/hooks/use-mark-agent-unread-action";
 
 // The trigger draws at 32pt beside its island neighbours, so only vertical slop is free.
 const TAB_SWITCHER_TRIGGER_HIT_SLOP = { top: 8, bottom: 8 } as const;
@@ -145,26 +146,7 @@ interface MobileWorkspaceTabSwitcherProps {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
 }
 
-function MobileWorkspaceTabOption({
-  tab,
-  tabIndex,
-  tabCount,
-  normalizedServerId,
-  normalizedWorkspaceId,
-  selected,
-  active,
-  onPress,
-  onCopyResumeCommand,
-  onCopyAgentId,
-  onCopyTerminalId,
-  onCopyFilePath,
-  onReloadAgent,
-  onRenameTab,
-  onCloseTab,
-  onCloseTabsAbove,
-  onCloseTabsBelow,
-  onCloseOtherTabs,
-}: {
+interface MobileWorkspaceTabOptionProps {
   tab: WorkspaceTabDescriptor;
   tabIndex: number;
   tabCount: number;
@@ -179,11 +161,55 @@ function MobileWorkspaceTabOption({
   onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  onMarkAgentUnread: ((agentId: string) => void) | undefined;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsAbove: (tabId: string) => Promise<void> | void;
   onCloseTabsBelow: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
-}) {
+}
+
+function MobileWorkspaceTabOption(props: MobileWorkspaceTabOptionProps) {
+  // The menu reads the resolved presentation: only a finished, read agent offers Mark as unread.
+  const renderPresentation = useCallback(
+    (presentation: WorkspaceTabPresentation) => (
+      <MobileWorkspaceTabOptionRow {...props} presentation={presentation} />
+    ),
+    [props],
+  );
+
+  return (
+    <WorkspaceTabPresentationResolver
+      tab={props.tab}
+      serverId={props.normalizedServerId}
+      workspaceId={props.normalizedWorkspaceId}
+    >
+      {renderPresentation}
+    </WorkspaceTabPresentationResolver>
+  );
+}
+
+function MobileWorkspaceTabOptionRow({
+  presentation,
+  tab,
+  tabIndex,
+  tabCount,
+  normalizedServerId,
+  normalizedWorkspaceId,
+  selected,
+  active,
+  onPress,
+  onCopyResumeCommand,
+  onCopyAgentId,
+  onCopyTerminalId,
+  onCopyFilePath,
+  onReloadAgent,
+  onRenameTab,
+  onMarkAgentUnread,
+  onCloseTab,
+  onCloseTabsAbove,
+  onCloseTabsBelow,
+  onCloseOtherTabs,
+}: MobileWorkspaceTabOptionProps & { presentation: WorkspaceTabPresentation }) {
   const { t } = useTranslation();
   const tabMenuLabels = useMemo<WorkspaceTabMenuLabels>(
     () => ({
@@ -192,6 +218,7 @@ function MobileWorkspaceTabOption({
       copyTerminalId: t("workspace.tabs.menu.copyTerminalId"),
       copyFilePath: t("workspace.tabs.menu.copyFilePath"),
       rename: t("workspace.tabs.menu.rename"),
+      markAsUnread: t("workspace.tabs.menu.markAsUnread"),
       closeAbove: t("workspace.tabs.menu.closeAbove"),
       closeBelow: t("workspace.tabs.menu.closeBelow"),
       closeLeft: t("workspace.tabs.menu.closeLeft"),
@@ -216,6 +243,7 @@ function MobileWorkspaceTabOption({
     onCopyFilePath,
     onReloadAgent,
     onRenameTab,
+    onMarkAgentUnread: presentation.isFinishedAndRead ? onMarkAgentUnread : undefined,
     onCloseTab,
     onCloseTabsBefore: onCloseTabsAbove,
     onCloseTabsAfter: onCloseTabsBelow,
@@ -254,27 +282,15 @@ function MobileWorkspaceTabOption({
     [menuTestIDBase, fallbackLabel, menuEntries, openWith],
   );
 
-  const renderPresentation = useCallback(
-    (presentation: WorkspaceTabPresentation) => (
-      <WorkspaceTabOptionRow
-        presentation={presentation}
-        selected={selected}
-        active={active}
-        onPress={onPress}
-        trailingAccessory={trailingAccessory}
-      />
-    ),
-    [selected, active, onPress, trailingAccessory],
-  );
-
   return (
-    <WorkspaceTabPresentationResolver
-      tab={tab}
-      serverId={normalizedServerId}
-      workspaceId={normalizedWorkspaceId}
-    >
-      {renderPresentation}
-    </WorkspaceTabPresentationResolver>
+    <WorkspaceTabOptionRow
+      testID={`workspace-tab-option-${tab.tabId}`}
+      presentation={presentation}
+      selected={selected}
+      active={active}
+      onPress={onPress}
+      trailingAccessory={trailingAccessory}
+    />
   );
 }
 
@@ -327,6 +343,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
   );
 
   const tabByKey = useMemo(() => new Map(tabs.map((tab) => [tab.key, tab])), [tabs]);
+  const onMarkAgentUnread = useMarkAgentUnreadAction(normalizedServerId);
   const triggerStyle = useIconButtonChromeStyle({ size: "large" });
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<View>(null);
@@ -416,6 +433,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
           onCopyFilePath={onCopyFilePath}
           onReloadAgent={onReloadAgent}
           onRenameTab={onRenameTab}
+          onMarkAgentUnread={onMarkAgentUnread}
           onCloseTab={onCloseTab}
           onCloseTabsAbove={onCloseTabsAbove}
           onCloseTabsBelow={onCloseTabsBelow}
@@ -435,6 +453,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
       onCopyFilePath,
       onReloadAgent,
       onRenameTab,
+      onMarkAgentUnread,
       onCloseTab,
       onCloseTabsAbove,
       onCloseTabsBelow,
