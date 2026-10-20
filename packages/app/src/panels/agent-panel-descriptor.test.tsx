@@ -74,6 +74,7 @@ describe("shared agent descriptor", () => {
       provider: "codex",
       title: "  Review checkout retries  ",
       status: "idle",
+      isArchived: false,
       pendingPermissionCount: 0,
       requiresAttention: false,
       attentionReason: null,

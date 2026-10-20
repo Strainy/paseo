@@ -700,6 +700,7 @@ export const es: TranslationResources = {
         copyTerminalId: "Copiar ID del terminal",
         copyFilePath: "Copy file path",
         rename: "Rebautizar",
+        markAsUnread: "Marcar como no leído",
         closeAbove: "Cerrar pestañas arriba",
         closeBelow: "Cerrar pestañas a continuación",
         closeLeft: "Cerrar pestañas a la izquierda",
@@ -750,6 +751,7 @@ export const es: TranslationResources = {
         reloadingAgent: "Agente de recarga...",
         reloadedAgent: "Agente recargado",
         failedToReloadAgent: "No se pudo recargar el agente",
+        failedToMarkAgentUnread: "No se pudo marcar el agente como no leído",
         failedToCloseAgent: "No se pudo cerrar el agente",
       },
       confirmations: {
