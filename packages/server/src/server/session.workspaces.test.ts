@@ -1906,6 +1906,118 @@ test("workspace mark unread rejects workspaces without a finished root agent", a
   });
 });
 
+test("agent mark unread marks a visible finished agent", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const record = makeStoredAgent({
+    id: "agent-1",
+    cwd: REPO_CWD,
+    workspaceId: "ws-repo-running",
+    updatedAt: "2026-03-30T16:00:00.000Z",
+  });
+  const markedAgentIds: string[] = [];
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    agentManager: {
+      markAgentUnread: async (agentId: string) => {
+        markedAgentIds.push(agentId);
+      },
+    },
+    agentStorage: { get: async (id: string) => (id === record.id ? record : null) },
+  });
+
+  await session.handleMessage({
+    type: "agent.mark_unread.request",
+    agentId: record.id,
+    requestId: "req-mark-unread",
+  });
+
+  expect(markedAgentIds).toEqual([record.id]);
+  expect(findByType(emitted, "agent.mark_unread.response").payload).toEqual({
+    requestId: "req-mark-unread",
+    agentId: record.id,
+    accepted: true,
+    error: null,
+  });
+});
+
+test("agent mark unread rejects unknown, archived, and hidden-provider agents", async () => {
+  const base = makeStoredAgent({
+    id: "agent-1",
+    cwd: REPO_CWD,
+    workspaceId: "ws-repo-running",
+    updatedAt: "2026-03-30T16:00:00.000Z",
+  });
+  const records = new Map<string, StoredAgentRecord>([
+    ["archived-agent", { ...base, id: "archived-agent", archivedAt: "2026-03-30T17:00:00.000Z" }],
+    ["hidden-agent", { ...base, id: "hidden-agent", provider: "pi" }],
+  ]);
+  const emitted: SessionOutboundMessage[] = [];
+  const markedAgentIds: string[] = [];
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    agentManager: {
+      markAgentUnread: async (agentId: string) => {
+        markedAgentIds.push(agentId);
+      },
+    },
+    agentStorage: { get: async (id: string) => records.get(id) ?? null },
+  });
+
+  for (const agentId of ["missing-agent", "archived-agent", "hidden-agent"]) {
+    await session.handleMessage({
+      type: "agent.mark_unread.request",
+      agentId,
+      requestId: `req-${agentId}`,
+    });
+  }
+
+  expect(markedAgentIds).toEqual([]);
+  expect(
+    emitted
+      .filter((message) => message.type === "agent.mark_unread.response")
+      .map((message) => message.payload),
+  ).toEqual(
+    ["missing-agent", "archived-agent", "hidden-agent"].map((agentId) => ({
+      requestId: `req-${agentId}`,
+      agentId,
+      accepted: false,
+      error: `Agent not found: ${agentId}`,
+    })),
+  );
+});
+
+test("agent mark unread reports agents that are no longer finished and read", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const record = makeStoredAgent({
+    id: "agent-1",
+    cwd: REPO_CWD,
+    workspaceId: "ws-repo-running",
+    updatedAt: "2026-03-30T16:00:00.000Z",
+  });
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    agentManager: {
+      markAgentUnread: async (agentId: string) => {
+        throw new Error(`Agent is no longer finished and read: ${agentId}`);
+      },
+    },
+    agentStorage: { get: async (id: string) => (id === record.id ? record : null) },
+  });
+
+  await session.handleMessage({
+    type: "agent.mark_unread.request",
+    agentId: record.id,
+    requestId: "req-mark-unread",
+  });
+
+  expect(findByType(emitted, "agent.mark_unread.response").payload).toEqual({
+    requestId: "req-mark-unread",
+    agentId: record.id,
+    accepted: false,
+    error: `Agent is no longer finished and read: ${record.id}`,
+  });
+});
+
 test("workspace clear attention can clear multiple workspaces in one request", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const workspaces = [
