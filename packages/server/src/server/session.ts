@@ -2754,6 +2754,8 @@ export class Session {
     switch (msg.type) {
       case "agent.detach.request":
         return this.handleDetachAgentRequest(msg.agentId, msg.requestId);
+      case "agent.mark_unread.request":
+        return this.handleAgentMarkUnreadRequest(msg.agentId, msg.requestId);
       default:
         return undefined;
     }
@@ -3422,6 +3424,38 @@ export class Session {
       this.sessionLogger.error({ err: error, agentId, requestId }, "Failed to detach agent");
       this.emit({
         type: "agent.detach.response",
+        payload: {
+          requestId,
+          agentId,
+          accepted: false,
+          error: message,
+        },
+      });
+    }
+  }
+
+  private async handleAgentMarkUnreadRequest(agentId: string, requestId: string): Promise<void> {
+    try {
+      const agent = await this.getAgentPayloadById(agentId);
+      if (!agent || agent.archivedAt) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+
+      await this.agentManager.markAgentUnread(agentId);
+      this.emit({
+        type: "agent.mark_unread.response",
+        payload: {
+          requestId,
+          agentId,
+          accepted: true,
+          error: null,
+        },
+      });
+    } catch (error) {
+      const message = getErrorMessage(error);
+      this.sessionLogger.error({ err: error, agentId }, "Failed to mark agent unread");
+      this.emit({
+        type: "agent.mark_unread.response",
         payload: {
           requestId,
           agentId,

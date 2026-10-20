@@ -341,6 +341,7 @@ function useAgentPanelDescriptor(
         provider: agent?.provider ?? "codex",
         title: agent?.title ?? null,
         status: agent?.status ?? null,
+        isArchived: Boolean(agent?.archivedAt),
         pendingPermissionCount: agent?.pendingPermissions.length ?? 0,
         requiresAttention: agent?.requiresAttention ?? false,
         attentionReason: agent?.attentionReason ?? null,
@@ -366,6 +367,14 @@ function useAgentPanelDescriptor(
           attentionReason: descriptorState.attentionReason,
         })
       : null,
+    // Mirrors the daemon's mark-unread precondition. The "done" status bucket also covers
+    // initializing agents, so it cannot stand in for this.
+    isFinishedAndRead:
+      (descriptorState.status === "idle" || descriptorState.status === "closed") &&
+      !descriptorState.isArchived &&
+      !descriptorState.requiresAttention &&
+      descriptorState.pendingPermissionCount === 0 &&
+      !descriptorState.isTurnActive,
   };
 }
 
@@ -829,6 +838,7 @@ function ChatAgentContent({
     hasAppliedAuthoritativeHistory || replicaTimelineStatus === "painted";
 
   const attentionController = useAgentAttentionClear({
+    serverId,
     agentId,
     client,
     isConnected,

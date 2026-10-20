@@ -391,6 +391,51 @@ describe("agent detach RPC", () => {
   });
 });
 
+describe("agent mark-unread RPC", () => {
+  test("parses the namespaced mark-unread request and response", () => {
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "agent.mark_unread.request",
+        agentId: "agent-1",
+        requestId: "req-mark-unread",
+      }),
+    ).toEqual({
+      type: "agent.mark_unread.request",
+      agentId: "agent-1",
+      requestId: "req-mark-unread",
+    });
+
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "agent.mark_unread.response",
+        payload: {
+          requestId: "req-mark-unread",
+          agentId: "agent-1",
+          accepted: false,
+          error: "Agent is no longer finished and read: agent-1",
+        },
+      }),
+    ).toEqual({
+      type: "agent.mark_unread.response",
+      payload: {
+        requestId: "req-mark-unread",
+        agentId: "agent-1",
+        accepted: false,
+        error: "Agent is no longer finished and read: agent-1",
+      },
+    });
+  });
+
+  test("parses the agentMarkUnread server feature gate", () => {
+    const parsed = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "srv-test",
+      features: { agentMarkUnread: true },
+    });
+    expect(parsed?.features?.agentMarkUnread).toBe(true);
+  });
+});
+
 describe("agent setting action responses", () => {
   test("parses optional provider notices on mode and thinking responses", () => {
     const mode = SessionOutboundMessageSchema.parse({

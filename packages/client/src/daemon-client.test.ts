@@ -3839,6 +3839,76 @@ test("marks a workspace unread through the dotted RPC", async () => {
   await expect(markPromise).resolves.toBeUndefined();
 });
 
+test("marks an agent unread through the dotted RPC", async () => {
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const markPromise = client.markAgentUnread("agent-1", "req-mark-unread");
+  expect(parseSentFrame(mock.sent[0])).toEqual({
+    type: "agent.mark_unread.request",
+    agentId: "agent-1",
+    requestId: "req-mark-unread",
+  });
+
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "agent.mark_unread.response",
+      payload: {
+        requestId: "req-mark-unread",
+        agentId: "agent-1",
+        accepted: true,
+        error: null,
+      },
+    }),
+  );
+
+  await expect(markPromise).resolves.toBeUndefined();
+});
+
+test("rejects when the daemon declines to mark an agent unread", async () => {
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const markPromise = client.markAgentUnread("agent-1", "req-mark-unread");
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "agent.mark_unread.response",
+      payload: {
+        requestId: "req-mark-unread",
+        agentId: "agent-1",
+        accepted: false,
+        error: "Agent is no longer finished and read: agent-1",
+      },
+    }),
+  );
+
+  await expect(markPromise).rejects.toThrow("Agent is no longer finished and read: agent-1");
+});
+
 test("searches GitHub repositories through the dotted RPC", async () => {
   const logger = createMockLogger();
   const mock = createMockTransport();

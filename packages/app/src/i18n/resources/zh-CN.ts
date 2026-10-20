@@ -647,6 +647,7 @@ export const zhCN: TranslationResources = {
         copyTerminalId: "复制 Terminal ID",
         copyFilePath: "Copy file path",
         rename: "重命名",
+        markAsUnread: "标记为未读",
         closeAbove: "关闭上方标签",
         closeBelow: "关闭下方标签",
         closeLeft: "关闭左侧标签",
@@ -696,6 +697,7 @@ export const zhCN: TranslationResources = {
         reloadingAgent: "正在重新加载 Agent...",
         reloadedAgent: "已重新加载 Agent",
         failedToReloadAgent: "重新加载 Agent 失败",
+        failedToMarkAgentUnread: "将 Agent 标记为未读失败",
         failedToCloseAgent: "关闭 Agent 失败",
       },
       confirmations: {
