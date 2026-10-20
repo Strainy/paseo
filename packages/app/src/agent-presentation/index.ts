@@ -31,6 +31,12 @@ export function resolveAgentLabel(title: string | null | undefined): string | nu
   return normalized;
 }
 
+type SessionEntry = ReturnType<typeof useSessionStore.getState>["sessions"][string];
+
+function findSessionAgent(session: SessionEntry | undefined, agentId: string): Agent | null {
+  return session?.agents?.get(agentId) ?? session?.agentDetails?.get(agentId) ?? null;
+}
+
 export function useAgentDescriptor(
   target: { kind: "agent"; agentId: string },
   context: { serverId: string },
@@ -39,13 +45,13 @@ export function useAgentDescriptor(
   const descriptorState = useSessionStore(
     useShallow((state) => {
       const session = state.sessions[context.serverId];
-      const agent =
-        session?.agents?.get(target.agentId) ?? session?.agentDetails?.get(target.agentId) ?? null;
+      const agent = findSessionAgent(session, target.agentId);
       return {
         provider: agent?.provider ?? "codex",
         title: agent?.title ?? null,
         status: agent?.status ?? null,
         backgroundWork: agent?.backgroundWork,
+        isArchived: Boolean(agent?.archivedAt),
         pendingPermissionCount: agent?.pendingPermissions.length ?? 0,
         requiresAttention: agent?.requiresAttention ?? false,
         attentionReason: agent?.attentionReason ?? null,
@@ -62,6 +68,7 @@ export function buildAgentDescriptor(input: {
   title: string | null;
   status: Agent["status"] | null;
   backgroundWork?: Agent["backgroundWork"];
+  isArchived: boolean;
   pendingPermissionCount: number;
   requiresAttention: boolean;
   attentionReason: Agent["attentionReason"];
@@ -90,5 +97,13 @@ export function buildAgentDescriptor(input: {
     titleState: label ? "ready" : "loading",
     icon: input.icon,
     statusBucket,
+    // Mirrors the daemon's mark-unread precondition. The "done" status bucket also covers
+    // initializing agents, so it cannot stand in for this.
+    isFinishedAndRead:
+      (input.status === "idle" || input.status === "closed") &&
+      !input.isArchived &&
+      !input.requiresAttention &&
+      input.pendingPermissionCount === 0 &&
+      !input.isTurnActive,
   };
 }
