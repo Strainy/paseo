@@ -239,6 +239,7 @@ test.describe("compact overview tool calls", () => {
         contentType: "application/json",
       });
 
+      await expect(badges.last()).toBeInViewport({ ratio: 1 });
       await badges.last().click();
       const detailClose = page.getByTestId("tool-call-sheet-close");
       await expect(detailClose).toBeVisible();
