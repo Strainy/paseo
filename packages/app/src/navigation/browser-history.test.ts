@@ -183,6 +183,49 @@ describe("browser history", () => {
     expect(window.history.length).toBe(length);
     expect(window.history.state.paseoView).toEqual({ href: workspace, tabId: "a" });
   });
+
+  it("records an offline agent destination and replaces it when its workspace resolves", async () => {
+    history = createBrowserHistory((view) => history.record(view));
+    history.record({ href: "/open-project", tabId: null });
+    const length = window.history.length;
+    history.record({ href: "/h/host/agent/a", tabId: null });
+    expect(window.location.pathname).toBe("/h/host/agent/a");
+    expect(window.history.length).toBe(length + 1);
+    history.record({ href: workspace, tabId: "agent_a" });
+    expect(window.location.pathname).toBe(workspace);
+    expect(window.history.length).toBe(length + 1);
+    await traverse(-1);
+    expect(window.location.pathname).toBe("/open-project");
+    await traverse(1);
+    expect(window.location.pathname).toBe(workspace);
+  });
+
+  it("keeps an offline agent destination when visiting settings to manage its host", async () => {
+    history = createBrowserHistory((view) => history.record(view));
+    history.record({ href: "/h/host/agent/a", tabId: null });
+    history.record({ href: "/settings/hosts/host/host", tabId: null });
+    await traverse(-1);
+    expect(window.location.pathname).toBe("/h/host/agent/a");
+  });
+
+  it("keeps an offline agent destination when choosing a different workspace tab", async () => {
+    history = createBrowserHistory((view) => history.record(view));
+    history.record({ href: "/h/host/agent/a", tabId: null });
+    history.record({ href: workspace, tabId: "agent_other" });
+    await traverse(-1);
+    expect(window.location.pathname).toBe("/h/host/agent/a");
+  });
+
+  it("restores the retained navigator route key for visits with the same route name", async () => {
+    const navigate = vi.fn((view: HistoryView) => history.record(view));
+    history = createBrowserHistory(navigate);
+    const first = { href: "/plugin/bot?bot=2", tabId: null, routeKey: "bot-two" };
+    const second = { href: "/plugin/bot?bot=1", tabId: null, routeKey: "bot-one" };
+    history.record(first);
+    history.record(second);
+    await traverse(-1);
+    expect(navigate).toHaveBeenLastCalledWith(first, expect.any(Function));
+  });
 });
 
 describe("history destinations", () => {
@@ -197,15 +240,16 @@ describe("history destinations", () => {
     );
   });
 
-  it.each([
-    "/",
-    "/h/host",
-    "/h/host/agent/a",
-    "/h/host/settings",
-    "/h/host/sessions",
-    "/settings/hosts/host",
-  ])("excludes redirect %s", (href) => {
-    expect(isHistoryDestination(href, false)).toBe(false);
+  it.each(["/", "/h/host", "/h/host/settings", "/h/host/sessions", "/settings/hosts/host"])(
+    "excludes redirect %s",
+    (href) => {
+      expect(isHistoryDestination(href, false)).toBe(false);
+    },
+  );
+
+  it("includes agent routes that can wait for an offline host", () => {
+    expect(isHistoryDestination("/h/host/agent/a", false)).toBe(true);
+    expect(canonicalHistoryHref("/h/host/agent/a?agentId=a")).toBe("/h/host/agent/a");
   });
 
   it("restores tabs locally when only internal workspace query echoes differ", () => {

@@ -723,6 +723,18 @@ describe.each([
 });
 
 describe("history shortcut overrides", () => {
+  it.each([false, true])(
+    "keeps non-mac Alt arrows available to terminal input (desktop: %s)",
+    (isDesktop) => {
+      for (const key of ["ArrowLeft", "ArrowRight"]) {
+        expectNoShortcutResolution({
+          event: { key, code: key, altKey: true },
+          context: { isMac: false, isDesktop, focusScope: "terminal" },
+        });
+      }
+    },
+  );
+
   it("keeps non-mac Ctrl brackets available to terminal input", () => {
     for (const [key, code] of [
       ["[", "BracketLeft"],

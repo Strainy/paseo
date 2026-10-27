@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { router, useNavigationContainerRef, useUnstableGlobalHref, type Href } from "expo-router";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigationContainerRef, useRootNavigationState } from "expo-router";
+import { findFocusedRoute, LinkingContext } from "expo-router/react-navigation";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   findPaneById,
@@ -9,6 +10,7 @@ import {
 import { revealWorkspaceTab } from "@/workspace-tabs/navigation";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import { navigateToHostWorkspaceRoute } from "./workspace-route-navigation";
+import { navigateToHistoryRoute } from "./history-route-navigation";
 import {
   canonicalHistoryHref,
   createBrowserHistory,
@@ -31,6 +33,7 @@ function restoreView(
   view: HistoryView,
   currentHref: string,
   complete: (view: HistoryView) => void,
+  navigate: (view: HistoryView) => void,
 ) {
   const workspace = parseHostWorkspaceRouteFromPathname(view.href);
   if (workspace && view.tabId) {
@@ -39,16 +42,25 @@ function restoreView(
   }
   if (isCurrentHistoryRoute(view.href, currentHref)) {
     // Tab focus is synchronous and may be a no-op, so no route event is needed.
-    complete({ href: view.href, tabId: selectedTab(view.href) });
+    complete({ ...view, tabId: selectedTab(view.href) });
   } else if (workspace) {
     navigateToHostWorkspaceRoute(view.href);
   } else {
-    router.replace(view.href as Href);
+    navigate(view);
   }
 }
 
 export function useBrowserHistory(): void {
-  const routeHref = useUnstableGlobalHref();
+  const { options: linking } = useContext(LinkingContext);
+  const rootState = useRootNavigationState();
+  // Global href merges stale ancestor params; the configured serializer uses
+  // the focused route's search params, matching Expo's normal browser URLs.
+  const routeHref = useMemo(() => {
+    if (!linking?.getPathFromState) {
+      throw new Error("Browser history requires Expo Router linking");
+    }
+    return linking.getPathFromState(rootState, linking.config);
+  }, [linking, rootState]);
   const href = canonicalHistoryHref(routeHref);
   const compact = useIsCompactFormFactor();
   const hydrated = useWorkspaceLayoutStoreHydrated();
@@ -75,7 +87,10 @@ export function useBrowserHistory(): void {
       setNavigationRevision(revisionRef.current);
     });
     const history = createBrowserHistory(
-      (view, complete) => restoreView(view, currentHrefRef.current, complete),
+      (view, complete) =>
+        restoreView(view, currentHrefRef.current, complete, (destination) =>
+          navigateToHistoryRoute(destination.href, navigation, linking, destination.routeKey),
+        ),
       () => revisionRef.current,
     );
     historyRef.current = history;
@@ -85,11 +100,19 @@ export function useBrowserHistory(): void {
       history.dispose();
       historyRef.current = null;
     };
-  }, [hydrated, navigation]);
+  }, [hydrated, navigation, linking]);
 
   useEffect(() => {
     if (!isHistoryDestination(href, compact)) return;
     // Restoring a tab can synchronously change the store before this effect runs.
-    historyRef.current?.record({ href, tabId: selectedTab(href) }, navigationRevision);
-  }, [href, tabId, compact, hydrated, navigationRevision]);
+    // Read the committed route key; Expo's render snapshot can still be partial at cold mount.
+    historyRef.current?.record(
+      {
+        href,
+        tabId: selectedTab(href),
+        routeKey: findFocusedRoute(navigation.getRootState())?.key,
+      },
+      navigationRevision,
+    );
+  }, [href, tabId, compact, hydrated, navigationRevision, navigation]);
 }

@@ -1,8 +1,14 @@
-import { stripHostWorkspaceRouteEchoSearch } from "@/utils/host-routes";
+import {
+  parseHostAgentRouteFromPathname,
+  parseHostWorkspaceRouteFromPathname,
+  stripHostWorkspaceRouteEchoSearch,
+} from "@/utils/host-routes";
+import { buildDeterministicWorkspaceTabId } from "@/workspace-tabs/identity";
 
 export interface HistoryView {
   href: string;
   tabId: string | null;
+  routeKey?: string;
 }
 
 export function canonicalHistoryHref(href: string): string {
@@ -10,6 +16,9 @@ export function canonicalHistoryHref(href: string): string {
   // COMPAT(workspace-open-url): added in v0.12.0, remove after 2027-01-22.
   // The workspace consumes this handoff; it must not replay on Back or reload.
   if (/^\/h\/[^/]+\/workspace\//.test(url.pathname)) url.searchParams.delete("open");
+  const agent = parseHostAgentRouteFromPathname(url.pathname);
+  if (agent && url.searchParams.get("agentId") === agent.agentId)
+    url.searchParams.delete("agentId");
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
@@ -25,7 +34,7 @@ export function isHistoryDestination(href: string, compact: boolean): boolean {
   if (pathname === "/") return false;
   if (!compact && pathname === "/settings") return false;
   if (/^\/settings\/hosts\/[^/]+\/?$/.test(pathname)) return false;
-  if (/^\/h\/[^/]+(?:\/?|\/(?:agent\/[^/]+|open-project|sessions|settings)\/?)$/.test(pathname)) {
+  if (/^\/h\/[^/]+(?:\/?|\/(?:open-project|sessions|settings)\/?)$/.test(pathname)) {
     return false;
   }
   return true;
@@ -38,12 +47,11 @@ function currentHref(): string {
 function readView(): HistoryView {
   const href = currentHref();
   const saved = window.history.state?.paseoView;
+  const matches = saved?.href === canonicalHistoryHref(href);
   return {
     href,
-    tabId:
-      saved?.href === canonicalHistoryHref(href) && typeof saved.tabId === "string"
-        ? saved.tabId
-        : null,
+    tabId: matches && typeof saved.tabId === "string" ? saved.tabId : null,
+    ...(matches && typeof saved.routeKey === "string" ? { routeKey: saved.routeKey } : {}),
   };
 }
 
@@ -57,8 +65,19 @@ export function createBrowserHistory(
 
   function commit(view: HistoryView) {
     view = { ...view, href: canonicalHistoryHref(view.href) };
+    const resolvingAgent = current && parseHostAgentRouteFromPathname(current.href);
+    const workspace = parseHostWorkspaceRouteFromPathname(view.href);
     const replacing =
-      !current || pending !== null || (current.href === view.href && !current.tabId);
+      !current ||
+      pending !== null ||
+      (current.href === view.href && !current.tabId) ||
+      (current.href === view.href &&
+        current.tabId === view.tabId &&
+        current.routeKey !== view.routeKey) ||
+      (resolvingAgent &&
+        workspace?.serverId === resolvingAgent.serverId &&
+        view.tabId ===
+          buildDeterministicWorkspaceTabId({ kind: "agent", agentId: resolvingAgent.agentId }));
     pending = null;
     if (current?.href === view.href && (current.tabId === view.tabId || !view.tabId) && !replacing)
       return;

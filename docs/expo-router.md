@@ -71,8 +71,9 @@ The navigator stack owns mounted screens, not visit order. Keep workspace
 workspace decks. The app's history owner lives in `src/navigation/use-browser-history.web.ts`.
 The Expo Router patch disables its web history synchronization while preserving
 route parsing, deep links, and native navigation. Do not add another URL writer
-or a separate mouse/keyboard history stack. Startup and resolver routes are
-excluded.
+or a separate mouse/keyboard history stack. Startup and immediate redirect
+routes are excluded. An agent route waiting for an offline host is a visit;
+resolving the agent replaces that visit with its workspace.
 
 ### Workspace route ownership
 

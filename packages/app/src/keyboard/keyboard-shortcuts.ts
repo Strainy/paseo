@@ -654,7 +654,12 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     id: "navigation-back-alt-left-non-mac",
     action: "navigation.back",
     combo: "Alt+ArrowLeft",
-    when: { mac: false, commandCenter: false, focusScope: HISTORY_FOCUS_SCOPES },
+    when: {
+      mac: false,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
     help: {
       id: "navigation-back",
       section: "general",
@@ -665,7 +670,12 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     id: "navigation-forward-alt-right-non-mac",
     action: "navigation.forward",
     combo: "Alt+ArrowRight",
-    when: { mac: false, commandCenter: false, focusScope: HISTORY_FOCUS_SCOPES },
+    when: {
+      mac: false,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
     help: {
       id: "navigation-forward",
       section: "general",

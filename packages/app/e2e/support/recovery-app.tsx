@@ -7,9 +7,12 @@ import { Link, Redirect, Stack, type Href } from "expo-router";
 import { useCallback, useState, type ComponentProps } from "react";
 import { Button, Text, View } from "react-native";
 import { RootRouter } from "../../src/root-app";
+import { useBrowserHistory } from "../../src/navigation/use-browser-history";
 
 const screenOptions = { headerShown: false };
 function Layout() {
+  // RootRouter disables Expo's history writer; match the production root layout's owner.
+  useBrowserHistory();
   return <Stack screenOptions={screenOptions} />;
 }
 // Fixture routes are absent from Expo's generated production route types.
