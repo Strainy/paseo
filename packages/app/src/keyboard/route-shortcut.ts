@@ -29,6 +29,8 @@ export type ShortcutAction =
   | { kind: "navigate-last-workspace" }
   | { kind: "router-replace"; route: string }
   | { kind: "router-back" }
+  | { kind: "history-back" }
+  | { kind: "history-forward" }
   | { kind: "router-push"; route: string }
   | { kind: "open-project-picker" }
   | { kind: "callback"; name: ShortcutCallbackName }
@@ -193,6 +195,10 @@ export function routeKeyboardShortcut(
   }
 
   switch (input.action) {
+    case "navigation.back":
+      return { kind: "history-back" };
+    case "navigation.forward":
+      return { kind: "history-forward" };
     case "workspace.tab.navigate.index":
       return routeWorkspaceTabNavigateIndex(input.payload);
     case "workspace.tab.navigate.relative":

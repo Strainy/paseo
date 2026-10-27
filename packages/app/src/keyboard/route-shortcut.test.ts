@@ -82,6 +82,22 @@ describe("routeKeyboardShortcut — dispatch passthroughs", () => {
   });
 });
 
+describe("routeKeyboardShortcut — history navigation", () => {
+  it.each(["/h/srv/workspace/ws-2", "/settings/general"])(
+    "traverses history independently of sidebar targets at %s",
+    (pathname) => {
+      const ctx = makeCtx({ pathname, sidebarShortcutTargets: [] });
+
+      expect(
+        routeKeyboardShortcut({ action: "navigation.back", payload: null }, ctx),
+      ).toEqual<ShortcutAction>({ kind: "history-back" });
+      expect(
+        routeKeyboardShortcut({ action: "navigation.forward", payload: null }, ctx),
+      ).toEqual<ShortcutAction>({ kind: "history-forward" });
+    },
+  );
+});
+
 describe("routeKeyboardShortcut — workspace.tab.navigate", () => {
   it("forwards index payloads to the workspace.tab.navigate-index dispatch", () => {
     expect(

@@ -1,0 +1,64 @@
+diff --git a/node_modules/expo-router/build/ExpoRoot.d.ts b/node_modules/expo-router/build/ExpoRoot.d.ts
+--- a/node_modules/expo-router/build/ExpoRoot.d.ts
++++ b/node_modules/expo-router/build/ExpoRoot.d.ts
+@@ -6,6 +6,7 @@
+     location?: URL | string;
+     wrapper?: ComponentType<PropsWithChildren>;
+     linking?: Partial<ExpoLinkingOptions>;
++    browserHistoryEnabled?: boolean;
+ };
+ export type NativeIntent = {
+     redirectSystemPath?: (event: {
+diff --git a/node_modules/expo-router/build/ExpoRoot.js b/node_modules/expo-router/build/ExpoRoot.js
+--- a/node_modules/expo-router/build/ExpoRoot.js
++++ b/node_modules/expo-router/build/ExpoRoot.js
+@@ -92,7 +92,7 @@
+     (0, navigation_1.handleNavigationOnReady)();
+     router_store_1.store.onReady();
+ }
+-function ContextNavigator({ context, location: initialLocation = initialUrl, wrapper: WrapperComponent = react_1.Fragment, linking = {}, }) {
++function ContextNavigator({ context, location: initialLocation = initialUrl, wrapper: WrapperComponent = react_1.Fragment, linking = {}, browserHistoryEnabled = true, }) {
+     // location and linking.getInitialURL are both used to initialize the router state
+     //  - location is used on web and during static rendering
+     //  - linking.getInitialURL is used on native
+@@ -132,7 +132,7 @@
+             return null;
+         }
+     }
+-    return ((0, jsx_runtime_1.jsx)(storeContext_1.StoreContext.Provider, { value: store, children: (0, jsx_runtime_1.jsx)(NavigationContainer_1.NavigationContainer, { ref: store.navigationRef, initialState: store.state, linking: store.linking, onUnhandledAction: onUnhandledAction, onStateChange: store.onStateChange, documentTitle: documentTitle, onReady: onNavigationReady, children: (0, jsx_runtime_1.jsx)(serverLocationContext_1.ServerContext.Provider, { value: serverContext, children: (0, jsx_runtime_1.jsx)(WrapperComponent, { children: (0, jsx_runtime_1.jsx)(Content, {}) }) }) }) }));
++    return ((0, jsx_runtime_1.jsx)(storeContext_1.StoreContext.Provider, { value: store, children: (0, jsx_runtime_1.jsx)(NavigationContainer_1.NavigationContainer, { ref: store.navigationRef, initialState: store.state, linking: store.linking, browserHistoryEnabled, onUnhandledAction: onUnhandledAction, onStateChange: store.onStateChange, documentTitle: documentTitle, onReady: onNavigationReady, children: (0, jsx_runtime_1.jsx)(serverLocationContext_1.ServerContext.Provider, { value: serverContext, children: (0, jsx_runtime_1.jsx)(WrapperComponent, { children: (0, jsx_runtime_1.jsx)(Content, {}) }) }) }) }));
+ }
+ function Content() {
+     const children = [(0, jsx_runtime_1.jsx)(primitives_1.Screen, { name: constants_1.INTERNAL_SLOT_NAME, component: router_store_1.store.rootComponent })];
+diff --git a/node_modules/expo-router/build/fork/NavigationContainer.d.ts b/node_modules/expo-router/build/fork/NavigationContainer.d.ts
+--- a/node_modules/expo-router/build/fork/NavigationContainer.d.ts
++++ b/node_modules/expo-router/build/fork/NavigationContainer.d.ts
+@@ -8,6 +8,7 @@
+ type Props<ParamList extends object> = NavigationContainerProps & {
+     direction?: LocaleDirection;
+     linking?: LinkingOptions<ParamList>;
++    browserHistoryEnabled?: boolean;
+     fallback?: React.ReactNode;
+     documentTitle?: DocumentTitleOptions;
+ };
+diff --git a/node_modules/expo-router/build/fork/NavigationContainer.js b/node_modules/expo-router/build/fork/NavigationContainer.js
+--- a/node_modules/expo-router/build/fork/NavigationContainer.js
++++ b/node_modules/expo-router/build/fork/NavigationContainer.js
+@@ -31,7 +31,7 @@
+  * @param props.children Child elements to render the content.
+  * @param props.ref Ref object which refers to the navigation object containing helper methods.
+  */
+-function NavigationContainerInner({ direction = react_native_1.I18nManager.getConstants().isRTL ? 'rtl' : 'ltr', theme = native_1.DefaultTheme, linking, fallback = null, documentTitle, onReady, onStateChange, ...rest }, ref) {
++function NavigationContainerInner({ direction = react_native_1.I18nManager.getConstants().isRTL ? 'rtl' : 'ltr', theme = native_1.DefaultTheme, linking, browserHistoryEnabled = true, fallback = null, documentTitle, onReady, onStateChange, ...rest }, ref) {
+     const isLinkingEnabled = linking ? linking.enabled !== false : false;
+     if (linking?.config) {
+         (0, native_1.validatePathConfig)(linking.config);
+@@ -44,7 +44,7 @@
+     const { getInitialState } = (0, useLinking_1.useLinking)(refContainer, {
+-        enabled: isLinkingEnabled,
+         prefixes: [],
+         ...linking,
++        enabled: isLinkingEnabled && (react_native_1.Platform.OS !== 'web' || browserHistoryEnabled),
+     }, setLastUnhandledLink);
+     const linkingContext = react_1.default.useMemo(() => ({ options: linking }), [linking]);
+     const unhandledLinkingContext = react_1.default.useMemo(() => ({ lastUnhandledLink, setLastUnhandledLink }), [lastUnhandledLink, setLastUnhandledLink]);

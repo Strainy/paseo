@@ -58,6 +58,24 @@ restore the same workspace and could repeat the crash.
 
 ## App-Wide Route Hops
 
+### Browser history
+
+Web and Electron use the browser History API for visits to pages, workspaces,
+and selected workspace tabs. Cmd-[ and Cmd-], browser controls, and mouse Back
+and Forward traverse that same history. Alt-[ and Alt-] cycle workspaces in
+sidebar order. A new visit after Back discards the forward branch.
+If a visited tab has since closed, return to its workspace's surviving selection.
+
+The navigator stack owns mounted screens, not visit order. Keep workspace
+`POP_TO`/`dismissTo` behaviour below; pushing a screen per visit creates duplicate
+workspace decks. The app's history owner lives in `src/navigation/use-browser-history.web.ts`.
+The Expo Router patch disables its web history synchronization while preserving
+route parsing, deep links, and native navigation. Do not add another URL writer
+or a separate mouse/keyboard history stack. Startup and resolver routes are
+excluded.
+
+### Workspace route ownership
+
 When app-wide routes such as `/new`, `/settings`, or `/sessions` navigate back
 into a host workspace, use `navigateToWorkspace()`. Do not make the caller
 branch on its current route.

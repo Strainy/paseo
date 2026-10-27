@@ -6,6 +6,7 @@ import {
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
 import {
+  closeWorkspaceAgentTab,
   createMockIdleAgent,
   expectWorkspaceTabHidden,
   expectWorkspaceTabVisible,
@@ -18,7 +19,7 @@ import {
 import { clickNewChat } from "../support/helpers/launcher";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
-import { seedWorkspace } from "../support/helpers/seed-client";
+import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import {
   getVisibleWorkspaceAgentTabIds,
   expectOnlyWorkspaceAgentTabsVisible,
@@ -39,7 +40,7 @@ import {
   workspaceDeckEntryLocator,
   expectWorkspaceDeckEntryCount,
 } from "../support/helpers/workspace-ui";
-import { clickSettingsBackToWorkspace } from "../support/helpers/settings";
+import { clickSettingsBackToWorkspace, openSettingsSection } from "../support/helpers/settings";
 import { getServerId } from "../support/helpers/server-id";
 import { expectAppRoute } from "../support/helpers/route-assertions";
 import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
@@ -105,8 +106,278 @@ async function openWorkspaceTabUrl(page: Page, route: string): Promise<void> {
   await expectAppRoute(page, route.split("?")[0]);
 }
 
+async function useMacKeyboardShortcuts(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+  });
+}
+
+async function expectHistoryWorkspace(page: Page, workspace: SeededWorkspace): Promise<void> {
+  const serverId = getServerId();
+  await expectAppRoute(page, buildHostWorkspaceRoute(serverId, workspace.workspaceId));
+  await expectSidebarWorkspaceSelected({ page, serverId, workspaceId: workspace.workspaceId });
+  await expectWorkspaceHeader(page, {
+    title: workspace.workspaceName,
+    subtitle: workspace.projectDisplayName,
+  });
+  await expect(workspaceDeckEntryLocator(page, serverId, workspace.workspaceId)).toBeVisible();
+}
+
+async function clickMouseHistoryButton(page: Page, button: "back" | "forward"): Promise<void> {
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      button,
+      buttons: button === "back" ? 8 : 16,
+      x: 8,
+      y: 8,
+      clickCount: 1,
+    });
+    await session.send("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      button,
+      buttons: 0,
+      x: 8,
+      y: 8,
+      clickCount: 1,
+    });
+  } finally {
+    await session.detach();
+  }
+}
+
+async function goBackTwiceWithoutWaitingForRender(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.addEventListener("popstate", () => window.history.back(), { once: true });
+    window.history.back();
+  });
+}
+
 test.describe("Workspace navigation regression", () => {
   test.describe.configure({ timeout: 240_000 });
+
+  test("shares workspace history across browser, keyboard and mouse navigation and truncates forward", async ({
+    page,
+  }) => {
+    const serverId = getServerId();
+    const firstWorkspace = await seedWorkspace({ repoPrefix: "history-workspace-a-" });
+    const secondWorkspace = await seedWorkspace({ repoPrefix: "history-workspace-b-" });
+    const thirdWorkspace = await seedWorkspace({ repoPrefix: "history-workspace-c-" });
+
+    try {
+      for (const workspace of [firstWorkspace, secondWorkspace, thirdWorkspace]) {
+        await createMockIdleAgent(workspace.client, {
+          cwd: workspace.repoPath,
+          workspaceId: workspace.workspaceId,
+          title: `History agent ${workspace.workspaceName}`,
+        });
+      }
+      await useMacKeyboardShortcuts(page);
+      await gotoAppShell(page);
+      await waitForSidebarHydration(page);
+
+      for (const workspace of [firstWorkspace, secondWorkspace, thirdWorkspace]) {
+        await switchWorkspaceViaSidebar({ page, serverId, workspaceId: workspace.workspaceId });
+        await expectHistoryWorkspace(page, workspace);
+        await waitForWorkspaceTabsVisible(page);
+      }
+
+      await goBackTwiceWithoutWaitingForRender(page);
+      await expectHistoryWorkspace(page, firstWorkspace);
+      await page.goForward();
+      await expectHistoryWorkspace(page, secondWorkspace);
+      await page.goForward();
+      await expectHistoryWorkspace(page, thirdWorkspace);
+
+      await page.goBack();
+      await expectHistoryWorkspace(page, secondWorkspace);
+      await page.keyboard.press("Meta+[");
+      await expectHistoryWorkspace(page, firstWorkspace);
+      await page.keyboard.press("Meta+]");
+      await expectHistoryWorkspace(page, secondWorkspace);
+      await clickMouseHistoryButton(page, "forward");
+      await expectHistoryWorkspace(page, thirdWorkspace);
+      await clickMouseHistoryButton(page, "back");
+      await expectHistoryWorkspace(page, secondWorkspace);
+
+      await switchWorkspaceViaSidebar({
+        page,
+        serverId,
+        workspaceId: firstWorkspace.workspaceId,
+      });
+      await expectHistoryWorkspace(page, firstWorkspace);
+      await page.goBack();
+      await expectHistoryWorkspace(page, secondWorkspace);
+      await page.goForward();
+      await expectHistoryWorkspace(page, firstWorkspace);
+
+      const session = await page.context().newCDPSession(page);
+      try {
+        const history = await session.send("Page.getNavigationHistory");
+        expect(history.currentIndex).toBe(history.entries.length - 1);
+      } finally {
+        await session.detach();
+      }
+      await expectWorkspaceDeckEntryCount(page, 3);
+    } finally {
+      await thirdWorkspace.cleanup();
+      await secondWorkspace.cleanup();
+      await firstWorkspace.cleanup();
+    }
+  });
+
+  test("traverses settings history and returns without duplicate workspace decks", async ({
+    page,
+  }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-settings-" });
+    try {
+      const agent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Settings history agent",
+      });
+      await page.goto(buildHostAgentDetailRoute(getServerId(), agent.id, agent.workspaceId));
+      await expectHistoryWorkspace(page, workspace);
+      await expectWorkspaceTabVisible(page, agent.id);
+
+      await openSettings(page);
+      await openSettingsSection(page, "appearance");
+      await openSettingsSection(page, "chat");
+      await page.goBack();
+      await expectAppRoute(page, "/settings/appearance");
+      await page.goBack();
+      await expectAppRoute(page, "/settings/general");
+      await page.goBack();
+      await expectHistoryWorkspace(page, workspace);
+      await expectWorkspaceDeckEntryCount(page, 1);
+
+      await page.goForward();
+      await expectAppRoute(page, "/settings/general");
+      await page.goForward();
+      await expectAppRoute(page, "/settings/appearance");
+      await page.goForward();
+      await expectAppRoute(page, "/settings/chat");
+      await clickSettingsBackToWorkspace(page);
+      await expectHistoryWorkspace(page, workspace);
+      await expectWorkspaceTabVisible(page, agent.id);
+      await expectWorkspaceDeckEntryCount(page, 1);
+
+      await page.goBack();
+      await expectAppRoute(page, "/settings/chat");
+      await page.goForward();
+      await expectHistoryWorkspace(page, workspace);
+      await expectWorkspaceDeckEntryCount(page, 1);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  test("restores agent tab history within a workspace and preserves forward after reload", async ({
+    page,
+  }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-agent-tabs-" });
+    try {
+      const firstAgent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "First history tab",
+      });
+      const secondAgent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Second history tab",
+      });
+      const thirdAgent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Legacy link history tab",
+      });
+      await useMacKeyboardShortcuts(page);
+      await openWorkspaceWithAgents(page, [firstAgent, secondAgent]);
+      const firstTab = page.getByTestId(`workspace-tab-agent_${firstAgent.id}`).filter({
+        visible: true,
+      });
+      const secondTab = page.getByTestId(`workspace-tab-agent_${secondAgent.id}`).filter({
+        visible: true,
+      });
+      await firstTab.click({ position: { x: 12, y: 13 } });
+      await expect(firstTab).toHaveAttribute("aria-selected", "true");
+      await secondTab.click({ position: { x: 12, y: 13 } });
+      await expect(secondTab).toHaveAttribute("aria-selected", "true");
+
+      await page.keyboard.press("Meta+[");
+      await expect(firstTab).toHaveAttribute("aria-selected", "true");
+      await expect(secondTab).toHaveAttribute("aria-selected", "false");
+      await expectHistoryWorkspace(page, workspace);
+      await page.keyboard.press("Meta+]");
+      await expect(secondTab).toHaveAttribute("aria-selected", "true");
+      await page.goBack();
+      await expect(firstTab).toHaveAttribute("aria-selected", "true");
+
+      await page.reload();
+      await waitForSidebarHydration(page);
+      await expectHistoryWorkspace(page, workspace);
+      await expect(firstTab).toHaveAttribute("aria-selected", "true");
+      await page.goForward();
+      await expect(secondTab).toHaveAttribute("aria-selected", "true");
+      await expect(firstTab).toHaveAttribute("aria-selected", "false");
+      await expectHistoryWorkspace(page, workspace);
+      await expectWorkspaceDeckEntryCount(page, 1);
+
+      const thirdTab = page.getByTestId(`workspace-tab-agent_${thirdAgent.id}`).filter({
+        visible: true,
+      });
+      await test.step("legacy open links create one canonical history entry", async () => {
+        await openWorkspaceTabUrl(
+          page,
+          buildHostWorkspaceOpenRoute(
+            getServerId(),
+            workspace.workspaceId,
+            `agent:${thirdAgent.id}`,
+          ),
+        );
+        await expect(thirdTab).toHaveAttribute("aria-selected", "true");
+        await expectHistoryWorkspace(page, workspace);
+        await page.goBack();
+        await expect(secondTab).toHaveAttribute("aria-selected", "true");
+        await page.goForward();
+        await expect(thirdTab).toHaveAttribute("aria-selected", "true");
+        await expectHistoryWorkspace(page, workspace);
+      });
+
+      await test.step("consecutive pop events restore the final tab without overwriting history", async () => {
+        await goBackTwiceWithoutWaitingForRender(page);
+        await expect(firstTab).toHaveAttribute("aria-selected", "true");
+        await expect(thirdTab).toHaveAttribute("aria-selected", "false");
+        await page.goForward();
+        await expect(secondTab).toHaveAttribute("aria-selected", "true");
+      });
+
+      await test.step("a closed history target keeps the surviving tab and later navigation usable", async () => {
+        await firstTab.hover();
+        await closeWorkspaceAgentTab(page, firstAgent.id);
+        await expect(secondTab).toHaveAttribute("aria-selected", "true");
+        await page.goBack();
+        await expectWorkspaceTabHidden(page, firstAgent.id);
+        await expect(secondTab).toHaveAttribute("aria-selected", "true");
+        await expectHistoryWorkspace(page, workspace);
+
+        await openSettings(page);
+        await page.goBack();
+        await expectHistoryWorkspace(page, workspace);
+        await expect(secondTab).toHaveAttribute("aria-selected", "true");
+        await page.goForward();
+        await expectAppRoute(page, "/settings/general");
+        await clickSettingsBackToWorkspace(page);
+        await expectHistoryWorkspace(page, workspace);
+        await expectWorkspaceTabHidden(page, firstAgent.id);
+        await expectWorkspaceDeckEntryCount(page, 1);
+      });
+    } finally {
+      await workspace.cleanup();
+    }
+  });
 
   test("removes a foreign pinned agent when restoring a saved workspace layout", async ({
     page,

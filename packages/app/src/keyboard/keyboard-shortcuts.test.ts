@@ -214,11 +214,10 @@ describe("keyboard-shortcuts", () => {
       payload: { delta: -1 },
     },
     {
-      name: "matches workspace relative navigation on desktop via Mod+]",
+      name: "matches history forward on desktop via Ctrl+]",
       event: { key: "]", code: "BracketRight", ctrlKey: true },
       context: { isDesktop: true },
-      action: "workspace.navigate.relative",
-      payload: { delta: 1 },
+      action: "navigation.forward",
     },
     {
       name: "matches tab relative navigation via Alt+Shift+]",
@@ -689,6 +688,76 @@ describe("keyboard-shortcuts", () => {
   });
 });
 
+describe.each([
+  { isMac: true, isDesktop: true },
+  { isMac: true, isDesktop: false },
+  { isMac: false, isDesktop: true },
+  { isMac: false, isDesktop: false },
+])("history and workspace shortcuts (mac: $isMac, desktop: $isDesktop)", (context) => {
+  it.each([
+    { key: "[", code: "BracketLeft", arrow: "ArrowLeft", action: "navigation.back", delta: -1 },
+    {
+      key: "]",
+      code: "BracketRight",
+      arrow: "ArrowRight",
+      action: "navigation.forward",
+      delta: 1,
+    },
+  ])("keeps $action separate from workspace cycling", ({ key, code, arrow, action, delta }) => {
+    const historyEvent = context.isMac
+      ? { key, code, metaKey: true }
+      : { key: arrow, code: arrow, altKey: true };
+
+    expectShortcutResolution({ event: historyEvent, context, action, payload: null });
+    expectShortcutResolution({
+      event: { key, code, altKey: true },
+      context,
+      action: "workspace.navigate.relative",
+      payload: { delta },
+    });
+    expectNoShortcutResolution({
+      event: historyEvent,
+      context: { ...context, focusScope: "browser" },
+    });
+  });
+});
+
+describe("history shortcut overrides", () => {
+  it("keeps non-mac Ctrl brackets available to terminal input", () => {
+    for (const [key, code] of [
+      ["[", "BracketLeft"],
+      ["]", "BracketRight"],
+    ]) {
+      expectNoShortcutResolution({
+        event: { key, code, ctrlKey: true },
+        context: { isMac: false, isDesktop: true, focusScope: "terminal" },
+      });
+    }
+  });
+
+  it("preserves the saved desktop workspace shortcut binding id", () => {
+    const context = { isMac: true, isDesktop: true };
+    const bindings = buildEffectiveBindings({
+      "workspace-navigate-relative-cmd-left-mac": "Cmd+Shift+Y",
+    });
+
+    expect(
+      resolveShortcut({
+        event: { key: "Y", code: "KeyY", metaKey: true, shiftKey: true },
+        context,
+        bindings,
+      }).match?.action,
+    ).toBe("workspace.navigate.relative");
+    expect(
+      resolveShortcut({
+        event: { key: "[", code: "BracketLeft", metaKey: true },
+        context,
+        bindings,
+      }).match?.action,
+    ).toBe("navigation.back");
+  });
+});
+
 describe("keyboard-shortcut help sections", () => {
   function findRow(sections: ReturnType<typeof buildKeyboardShortcutHelpSections>, id: string) {
     for (const section of sections) {
@@ -708,6 +777,10 @@ describe("keyboard-shortcut help sections", () => {
         "new-agent": ["mod", "O"],
         "workspace-tab-new": ["mod", "T"],
         "workspace-jump-index": ["alt", "1-9"],
+        "workspace-prev": ["alt", "["],
+        "workspace-next": ["alt", "]"],
+        "navigation-back": ["mod", "["],
+        "navigation-forward": ["mod", "]"],
         "workspace-tab-jump-index": ["alt", "shift", "1-9"],
         "workspace-tab-close-current": ["alt", "shift", "W"],
         "workspace-pane-split-right": ["mod", "\\"],
@@ -723,6 +796,10 @@ describe("keyboard-shortcut help sections", () => {
         "new-workspace": ["mod", "N"],
         "workspace-tab-new": ["mod", "T"],
         "workspace-jump-index": ["mod", "1-9"],
+        "workspace-prev": ["alt", "["],
+        "workspace-next": ["alt", "]"],
+        "navigation-back": ["mod", "["],
+        "navigation-forward": ["mod", "]"],
         "workspace-tab-jump-index": ["mod", "alt", "1-9"],
         // Derived from `combo: "Cmd+W"`, so the token is `mod` where the row
         // used to be hand-authored as `meta`. This binding is mac-only and
@@ -739,6 +816,10 @@ describe("keyboard-shortcut help sections", () => {
       expectedKeys: {
         "workspace-tab-jump-index": ["alt", "1-9"],
         "workspace-tab-close-current": ["ctrl", "W"],
+        "workspace-prev": ["alt", "["],
+        "workspace-next": ["alt", "]"],
+        "navigation-back": ["alt", "Left"],
+        "navigation-forward": ["alt", "Right"],
       },
     },
     {
@@ -751,6 +832,8 @@ describe("keyboard-shortcut help sections", () => {
       expectedKeys: {
         "toggle-left-sidebar": ["ctrl", "B"],
         "toggle-both-sidebars": ["ctrl", "."],
+        "navigation-back": ["alt", "Left"],
+        "navigation-forward": ["alt", "Right"],
       },
     },
   ];
