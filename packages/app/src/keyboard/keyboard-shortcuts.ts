@@ -159,6 +159,8 @@ export const SHORTCUT_HELP_ROW_ORDER: Record<ShortcutSectionId, readonly string[
     "search-files",
     "show-shortcuts",
     "toggle-settings",
+    "navigation-back",
+    "navigation-forward",
     "cycle-theme",
   ],
   workspaces: [
@@ -205,6 +207,8 @@ export const SHORTCUT_HELP_ROW_ORDER: Record<ShortcutSectionId, readonly string[
 };
 
 const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
+  "navigation-back": "common.actions.back",
+  "navigation-forward": "workspace.browser.controls.forward",
   "new-agent": "settings.shortcuts.help.openProject",
   "new-workspace": "settings.shortcuts.help.newWorkspace",
   "switch-project": "settings.shortcuts.help.switchProject",
@@ -253,6 +257,15 @@ const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
 const SHORTCUT_HELP_NOTE_KEYS: Record<string, string> = {
   "show-shortcuts": "settings.shortcuts.helpNotes.showKeyboardShortcuts",
 };
+
+// A focused embedded browser owns its history shortcuts.
+const HISTORY_FOCUS_SCOPES: readonly KeyboardFocusScope[] = [
+  "terminal",
+  "message-input",
+  "command-center",
+  "editable",
+  "other",
+];
 
 // --- Binding definitions ---
 
@@ -614,11 +627,91 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     },
   },
 
+  // --- History navigation ---
+  {
+    id: "navigation-back-cmd-left-mac",
+    action: "navigation.back",
+    combo: "Cmd+[",
+    when: { mac: true, commandCenter: false, focusScope: HISTORY_FOCUS_SCOPES },
+    help: {
+      id: "navigation-back",
+      section: "general",
+      label: "Back",
+    },
+  },
+  {
+    id: "navigation-forward-cmd-right-mac",
+    action: "navigation.forward",
+    combo: "Cmd+]",
+    when: { mac: true, commandCenter: false, focusScope: HISTORY_FOCUS_SCOPES },
+    help: {
+      id: "navigation-forward",
+      section: "general",
+      label: "Forward",
+    },
+  },
+  {
+    id: "navigation-back-alt-left-non-mac",
+    action: "navigation.back",
+    combo: "Alt+ArrowLeft",
+    when: {
+      mac: false,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
+    help: {
+      id: "navigation-back",
+      section: "general",
+      label: "Back",
+    },
+  },
+  {
+    id: "navigation-forward-alt-right-non-mac",
+    action: "navigation.forward",
+    combo: "Alt+ArrowRight",
+    when: {
+      mac: false,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
+    help: {
+      id: "navigation-forward",
+      section: "general",
+      label: "Forward",
+    },
+  },
+  {
+    id: "navigation-back-ctrl-left-non-mac",
+    action: "navigation.back",
+    combo: "Ctrl+[",
+    when: {
+      mac: false,
+      desktop: true,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
+  },
+  {
+    id: "navigation-forward-ctrl-right-non-mac",
+    action: "navigation.forward",
+    combo: "Ctrl+]",
+    when: {
+      mac: false,
+      desktop: true,
+      commandCenter: false,
+      terminal: false,
+      focusScope: HISTORY_FOCUS_SCOPES,
+    },
+  },
+
   // --- Workspace relative navigation ---
   {
     id: "workspace-navigate-relative-cmd-left-mac",
     action: "workspace.navigate.relative",
-    combo: "Cmd+[",
+    combo: "Alt+[",
     when: { mac: true, desktop: true, commandCenter: false },
     payload: { type: "delta", delta: -1 },
     help: {
@@ -630,8 +723,8 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-navigate-relative-ctrl-left-non-mac",
     action: "workspace.navigate.relative",
-    combo: "Ctrl+[",
-    when: { mac: false, desktop: true, commandCenter: false, terminal: false },
+    combo: "Alt+[",
+    when: { mac: false, desktop: true, commandCenter: false },
     payload: { type: "delta", delta: -1 },
     help: {
       id: "workspace-prev",
@@ -642,7 +735,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-navigate-relative-cmd-right-mac",
     action: "workspace.navigate.relative",
-    combo: "Cmd+]",
+    combo: "Alt+]",
     when: { mac: true, desktop: true, commandCenter: false },
     payload: { type: "delta", delta: 1 },
     help: {
@@ -654,8 +747,8 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-navigate-relative-ctrl-right-non-mac",
     action: "workspace.navigate.relative",
-    combo: "Ctrl+]",
-    when: { mac: false, desktop: true, commandCenter: false, terminal: false },
+    combo: "Alt+]",
+    when: { mac: false, desktop: true, commandCenter: false },
     payload: { type: "delta", delta: 1 },
     help: {
       id: "workspace-next",

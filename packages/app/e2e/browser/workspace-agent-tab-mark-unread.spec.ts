@@ -224,6 +224,17 @@ test("marks the active agent unread from the compact tab switcher", async ({ pag
 
   await test.step("the mark survives closing the switcher", async () => {
     await openTabSwitcher(page);
+    const handle = page.getByRole("slider", { name: "Bottom sheet handle" });
+    const snapTop = Math.round(844 * 0.4);
+    const handleTop = async () => Math.round((await handle.boundingBox())?.y ?? -1);
+    await expect.poll(handleTop).toBe(snapTop);
+    // Browser focus and scrollIntoView must not scroll the sheet's clipping host.
+    await page
+      .getByTestId(`workspace-tab-menu-agent_${firstAgentId}-trigger`)
+      .evaluate((trigger) => {
+        trigger.scrollIntoView({ block: "start", behavior: "instant" });
+      });
+    await expect.poll(handleTop).toBe(snapTop);
     await expectUnread(firstRow, false);
     await markSwitcherRowUnread(page, firstAgentId);
     await closeTabSwitcher(page);

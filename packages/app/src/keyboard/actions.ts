@@ -17,6 +17,8 @@ export type MessageInputKeyboardActionKind =
   | "mode-cycle";
 
 export type KeyboardActionId =
+  | "navigation.back"
+  | "navigation.forward"
   | "agent.interrupt"
   | "agent.new"
   | "workspace.tab.menu.open"

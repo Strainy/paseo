@@ -1,3 +1,47 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
+index 350b8cc..39fff05 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
+@@ -28,7 +28,7 @@ function BottomSheetHostingContainerComponent({
+   const containerStyle = (0, _react.useMemo)(() => [style, _reactNative.StyleSheet.absoluteFill, _styles.styles.container, {
+     top: topInset,
+     bottom: bottomInset,
+-    overflow: detached ? 'visible' : 'hidden'
++    overflow: detached ? 'visible' : _styles.containerOverflow
+   }], [style, detached, topInset, bottomInset]);
+   //#endregion
+ 
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.js
+index b3d6983..65030a7 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.js
+@@ -3,8 +3,9 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.styles = void 0;
++exports.styles = exports.containerOverflow = void 0;
+ var _reactNative = require("react-native");
++const containerOverflow = exports.containerOverflow = 'hidden';
+ const styles = exports.styles = _reactNative.StyleSheet.create({
+   container: {
+     pointerEvents: 'box-none'
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.web.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.web.js
+index 7eb97a6..d3a4f69 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.web.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetHostingContainer/styles.web.js
+@@ -3,8 +3,10 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.styles = void 0;
++exports.styles = exports.containerOverflow = void 0;
+ var _reactNative = require("react-native");
++// Clip translated sheets without allowing focus or scrollIntoView to scroll their host.
++const containerOverflow = exports.containerOverflow = 'clip';
+ const styles = exports.styles = _reactNative.StyleSheet.create({
+   container: {
+     position: 'absolute',
 diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetModal/BottomSheetModal.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetModal/BottomSheetModal.js
 index ee51e76..dc1bc17 100644
 --- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetModal/BottomSheetModal.js
@@ -60,6 +104,55 @@ index e44ad86..96555ef 100644
  var _useScrollEventsHandlersDefault = require("./hooks/useScrollEventsHandlersDefault");
  var _useGestureEventsHandlersDefault = require("./hooks/useGestureEventsHandlersDefault");
  var _useBottomSheetGestureHandlers = require("./hooks/useBottomSheetGestureHandlers");
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
+index a088ef2..9e1eed3 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/BottomSheetHostingContainer.js
+@@ -3,7 +3,7 @@
+ import React, { memo, useCallback, useMemo, useRef } from 'react';
+ import { Dimensions, StatusBar, StyleSheet, View } from 'react-native';
+ import { print } from '../../utilities';
+-import { styles } from './styles';
++import { containerOverflow, styles } from './styles';
+ import { jsx as _jsx } from "react/jsx-runtime";
+ function BottomSheetHostingContainerComponent({
+   containerLayoutState,
+@@ -23,7 +23,7 @@ function BottomSheetHostingContainerComponent({
+   const containerStyle = useMemo(() => [style, StyleSheet.absoluteFill, styles.container, {
+     top: topInset,
+     bottom: bottomInset,
+-    overflow: detached ? 'visible' : 'hidden'
++    overflow: detached ? 'visible' : containerOverflow
+   }], [style, detached, topInset, bottomInset]);
+   //#endregion
+ 
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.js
+index e2566a0..0bea36c 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.js
+@@ -1,6 +1,8 @@
+ "use strict";
+ 
+ import { StyleSheet } from 'react-native';
++export const containerOverflow = 'hidden';
++
+ export const styles = StyleSheet.create({
+   container: {
+     pointerEvents: 'box-none'
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.web.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.web.js
+index a56aef6..eef0796 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.web.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetHostingContainer/styles.web.js
+@@ -1,6 +1,9 @@
+ "use strict";
+ 
+ import { StyleSheet } from 'react-native';
++// Clip translated sheets without allowing focus or scrollIntoView to scroll their host.
++export const containerOverflow = 'clip';
++
+ export const styles = StyleSheet.create({
+   container: {
+     position: 'absolute',
 diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetModal/BottomSheetModal.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetModal/BottomSheetModal.js
 index 94fabdb..60ca66a 100644
 --- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetModal/BottomSheetModal.js
@@ -121,6 +214,53 @@ index ffc6caa..550f1b3 100644
  export { useScrollEventsHandlersDefault } from './hooks/useScrollEventsHandlersDefault';
  export { useGestureEventsHandlersDefault } from './hooks/useGestureEventsHandlersDefault';
  export { useBottomSheetGestureHandlers } from './hooks/useBottomSheetGestureHandlers';
+diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/BottomSheetHostingContainer.tsx b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/BottomSheetHostingContainer.tsx
+index 879061d..4ec6eaa 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/BottomSheetHostingContainer.tsx
++++ b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/BottomSheetHostingContainer.tsx
+@@ -9,7 +9,7 @@ import {
+   type ViewStyle,
+ } from 'react-native';
+ import { print } from '../../utilities';
+-import { styles } from './styles';
++import { containerOverflow, styles } from './styles';
+ import type { BottomSheetHostingContainerProps } from './types';
+ 
+ function BottomSheetHostingContainerComponent({
+@@ -35,7 +35,7 @@ function BottomSheetHostingContainerComponent({
+       {
+         top: topInset,
+         bottom: bottomInset,
+-        overflow: detached ? 'visible' : 'hidden',
++        overflow: detached ? 'visible' : containerOverflow,
+       },
+     ],
+     [style, detached, topInset, bottomInset]
+diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.ts b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.ts
+index c9d917b..c863619 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.ts
+@@ -1,5 +1,7 @@
+ import { StyleSheet } from 'react-native';
+ 
++export const containerOverflow = 'hidden';
++
+ export const styles = StyleSheet.create({
+   container: { pointerEvents: 'box-none' },
+ });
+diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.web.ts b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.web.ts
+index 42836a2..d516f30 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.web.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetHostingContainer/styles.web.ts
+@@ -1,5 +1,8 @@
+ import { StyleSheet } from 'react-native';
+ 
++// Clip translated sheets without allowing focus or scrollIntoView to scroll their host.
++export const containerOverflow = 'clip';
++
+ export const styles = StyleSheet.create({
+   container: {
+     position: 'absolute',
 diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetModal/BottomSheetModal.tsx b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetModal/BottomSheetModal.tsx
 index 2954b3f..7260656 100644
 --- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetModal/BottomSheetModal.tsx

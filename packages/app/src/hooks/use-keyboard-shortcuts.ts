@@ -35,6 +35,7 @@ import { getDesktopHost, isElectronRuntime } from "@/desktop/host";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 import { hasActiveWebOverlay } from "@/lib/overlay-root";
+import { goBack, goForward } from "@/navigation/history-actions";
 import {
   type ActiveWorkspaceSelection,
   navigateToLastWorkspace,
@@ -185,6 +186,12 @@ export function useKeyboardShortcuts({
         return true;
       case "router-back":
         router.back();
+        return true;
+      case "history-back":
+        goBack();
+        return true;
+      case "history-forward":
+        goForward();
         return true;
       case "router-push":
         router.push(action.route as Parameters<typeof router.push>[0]);
