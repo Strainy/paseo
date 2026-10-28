@@ -1,7 +1,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
-import { router } from "expo-router";
+import { goBack } from "@/navigation/history-actions";
 import { ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -117,7 +117,7 @@ function BackButton({ onBack }: { onBack?: () => void }) {
       onBack();
       return;
     }
-    router.back();
+    goBack();
   }, [onBack]);
   return (
     <HeaderToggleButton
