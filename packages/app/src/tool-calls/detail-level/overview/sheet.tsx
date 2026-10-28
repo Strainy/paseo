@@ -5,6 +5,7 @@ import { Wrench } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   type ContextBridge,
+  SheetVisibleFrame,
   useIsolatedBottomSheetVisibility,
 } from "@/components/ui/isolated-bottom-sheet-modal";
 import { SheetHeaderView, type SheetHeader } from "@/components/adaptive-modal-sheet";
@@ -69,16 +70,18 @@ export function OverviewToolCallGroupSheet({
       backdropOpacity={0.5}
       enablePanDownToClose
     >
-      <View style={styles.container} testID="tool-call-group-sheet">
-        <SheetHeaderView
-          header={header}
-          onClose={onClose}
-          closeTestID="tool-call-group-sheet-close"
-        />
-        <BottomSheetScrollView ref={scrollRef} style={styles.content}>
-          <View style={styles.contentContainer}>{children}</View>
-        </BottomSheetScrollView>
-      </View>
+      <SheetVisibleFrame>
+        <View style={styles.container} testID="tool-call-group-sheet">
+          <SheetHeaderView
+            header={header}
+            onClose={onClose}
+            closeTestID="tool-call-group-sheet-close"
+          />
+          <BottomSheetScrollView ref={scrollRef} style={styles.content}>
+            <View style={styles.contentContainer}>{children}</View>
+          </BottomSheetScrollView>
+        </View>
+      </SheetVisibleFrame>
     </ToolCallSheetModal>
   );
 }

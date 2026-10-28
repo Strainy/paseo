@@ -6,6 +6,7 @@ import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
 import {
   IsolatedBottomSheetModal,
+  SheetVisibleFrame,
   type ContextBridge,
   useIsolatedBottomSheetVisibility,
 } from "@/components/ui/isolated-bottom-sheet-modal";
@@ -131,7 +132,11 @@ export function ToolCallSheetProvider({ children }: ToolCallSheetProviderProps) 
         backdropOpacity={0.5}
         enablePanDownToClose
       >
-        {sheetData && <ToolCallSheetContent data={sheetData} onClose={closeToolCall} />}
+        {sheetData && (
+          <SheetVisibleFrame>
+            <ToolCallSheetContent data={sheetData} onClose={closeToolCall} />
+          </SheetVisibleFrame>
+        )}
       </ToolCallSheetModal>
     </ToolCallSheetContext.Provider>
   );
