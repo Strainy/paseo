@@ -1,9 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NavigationContainerRefWithCurrent } from "expo-router/react-navigation";
 import {
+  StackRouter,
+  type LinkingOptions,
+  type NavigationAction,
+  type NavigationState,
+  type ParamListBase,
+  type PartialState,
+  type StackNavigationState,
+} from "expo-router/react-navigation";
+import { navigateToHistoryRoute } from "./history-route-navigation";
+import {
   navigateToHostWorkspaceRoute,
   registerWorkspaceRouteNavigationRef,
 } from "./workspace-route-navigation";
+
+// Load the real reducers without the public barrel's native screen components.
+vi.mock("expo-router/react-navigation", async () => {
+  const [actions, routers] = await Promise.all([
+    import("expo-router/build/react-navigation/core/getActionFromState"),
+    import("expo-router/build/react-navigation/routers/StackRouter"),
+  ]);
+  return { getActionFromState: actions.getActionFromState, StackRouter: routers.StackRouter };
+});
 
 function createNavigationRef(rootState: unknown, options: { ready?: boolean } = {}) {
   const dispatch = vi.fn();
@@ -32,6 +51,140 @@ function createNavigationRef(rootState: unknown, options: { ready?: boolean } = 
     },
   };
 }
+
+describe("navigateToHistoryRoute", () => {
+  const pluginScreen = "plugin/[pluginId]/[contributionKind]/[contributionId]";
+  const hostScreen = "h/[serverId]";
+  const router = StackRouter({});
+
+  function stack(routes: StackNavigationState<ParamListBase>["routes"], key: string) {
+    const options = {
+      routeNames: [...new Set(routes.map((route) => route.name))],
+      routeParamList: {},
+      routeGetIdList: {},
+    };
+    const state: StackNavigationState<ParamListBase> = {
+      key,
+      stale: false,
+      type: "stack",
+      index: routes.length - 1,
+      routeNames: options.routeNames,
+      routes,
+      preloadedRoutes: [],
+    };
+    return { state, options };
+  }
+
+  function linkingTo(
+    routes: PartialState<NavigationState>["routes"],
+  ): LinkingOptions<ReactNavigation.RootParamList> {
+    return { prefixes: [], getStateFromPath: () => ({ routes }) };
+  }
+
+  type ReplayAction = Extract<
+    Parameters<typeof router.getStateForAction>[1],
+    { type: "POP" | "NAVIGATE" }
+  >;
+
+  function isReplayAction(action: NavigationAction): action is ReplayAction {
+    if (!action.payload) return false;
+    return (
+      (action.type === "POP" &&
+        "count" in action.payload &&
+        typeof action.payload.count === "number") ||
+      (action.type === "NAVIGATE" &&
+        "name" in action.payload &&
+        typeof action.payload.name === "string")
+    );
+  }
+
+  function reduce(current: ReturnType<typeof stack>, action: ReplayAction) {
+    const next = router.getStateForAction(current.state, action, current.options);
+    if (!next) throw new Error(`Stack did not handle ${action.type}`);
+    current.state = router.getRehydratedState(next, current.options);
+  }
+
+  it("reveals the exact retained host and same-name plugin instance before applying params", () => {
+    const host = stack(
+      [
+        { key: "bot-2-draft", name: pluginScreen, params: { "param.botId": "bot-2" } },
+        { key: "bot-1-draft", name: pluginScreen, params: { "param.botId": "bot-1" } },
+      ],
+      "host-stack",
+    );
+    const root = stack(
+      [
+        { key: "retained-host", name: hostScreen, state: host.state },
+        { key: "other-host", name: hostScreen },
+        { key: "settings", name: "settings/[section]" },
+      ],
+      "root-stack",
+    );
+    const dispatch = vi.fn((action: NavigationAction) => {
+      if (!isReplayAction(action)) throw new Error(`Unexpected action: ${action.type}`);
+      if (action.type !== "POP") return;
+      if (action.target === root.state.key) {
+        reduce(root, action);
+      } else if (action.target === host.state.key) {
+        reduce(host, action);
+      }
+    });
+
+    navigateToHistoryRoute(
+      "/h/server/plugin/bots/surface/bot?param.botId=bot-2",
+      { dispatch, getRootState: () => root.state },
+      linkingTo([
+        {
+          name: hostScreen,
+          params: { serverId: "server" },
+          state: { routes: [{ name: pluginScreen, params: { "param.botId": "bot-2" } }] },
+        },
+      ]),
+      "bot-2-draft",
+    );
+
+    expect(root.state.routes.map((route) => route.key)).toEqual(["retained-host"]);
+    expect(host.state.routes.map((route) => route.key)).toEqual(["bot-2-draft"]);
+    expect(dispatch.mock.calls.map(([action]) => action.type)).toEqual(["POP", "POP", "NAVIGATE"]);
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: "NAVIGATE",
+      payload: {
+        name: hostScreen,
+        path: undefined,
+        pop: true,
+        params: expect.objectContaining({ screen: pluginScreen, pop: true }),
+      },
+    });
+  });
+
+  it.each(["current-draft", "missing-after-reload"])(
+    "applies historical query params when the saved key is %s",
+    (routeKey) => {
+      const current = stack(
+        [{ key: "current-draft", name: pluginScreen, params: { "param.botId": "bot-1" } }],
+        "host-stack",
+      );
+      const dispatch = vi.fn((action: NavigationAction) => {
+        if (!isReplayAction(action)) throw new Error(`Unexpected action: ${action.type}`);
+        reduce(current, action);
+      });
+
+      navigateToHistoryRoute(
+        "/h/server/plugin/bots/surface/bot?param.botId=bot-2",
+        { dispatch, getRootState: () => current.state },
+        linkingTo([{ name: pluginScreen, params: { "param.botId": "bot-2" } }]),
+        routeKey,
+      );
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(current.state.routes).toHaveLength(1);
+      expect(current.state.routes[0]).toMatchObject({
+        key: "current-draft",
+        params: { "param.botId": "bot-2" },
+      });
+    },
+  );
+});
 
 describe("navigateToHostWorkspaceRoute", () => {
   beforeEach(() => {
