@@ -1,7 +1,7 @@
 import { useCallback, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable } from "react-native";
-import { router } from "expo-router";
+import { goBack } from "@/navigation/history-actions";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ArrowLeft } from "lucide-react-native";
 import { ScreenHeader } from "./screen-header";
@@ -13,10 +13,6 @@ interface BackHeaderProps {
   title?: string;
   rightContent?: ReactNode;
   onBack?: () => void;
-}
-
-function goBack(): void {
-  router.back();
 }
 
 export function BackHeader({ title, rightContent, onBack }: BackHeaderProps) {

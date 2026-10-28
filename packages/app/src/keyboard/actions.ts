@@ -19,6 +19,8 @@ export type MessageInputKeyboardActionKind =
   | "effort-cycle";
 
 export type KeyboardActionId =
+  | "navigation.back"
+  | "navigation.forward"
   | "agent.interrupt"
   | "agent.new"
   | "workspace.tab.menu.open"

@@ -65,6 +65,7 @@ async function reloadToPicker(page: Page) {
 }
 async function openHealthyWorkspace(page: Page) {
   await page.getByRole("link", { name: "Open healthy workspace" }).click();
+  await expect(page).toHaveURL(`${appUrl}/healthy`);
   await expect(page.getByText("Healthy workspace", { exact: true })).toBeVisible();
 }
 async function breakCurrentWorkspace(page: Page) {

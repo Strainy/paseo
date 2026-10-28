@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useNavigation } from "expo-router/react-navigation";
+import { useNavigation, type NavigationProp } from "expo-router/react-navigation";
 import { StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
@@ -30,12 +30,8 @@ import {
   parseWorkspaceOpenIntent,
   type WorkspaceOpenIntent,
 } from "@/utils/host-routes";
-import {
-  replaceBrowserRouteWithCanonicalHostWorkspaceRoute,
-  stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit,
-} from "@/utils/host-route-browser";
 import { prepareWorkspaceTab } from "@/utils/prepare-workspace-tab";
-import { isNative, isWeb } from "@/constants/platform";
+import { isNative } from "@/constants/platform";
 import { RenderProfile } from "@/utils/render-profiler";
 
 function getParamValue(value: string | string[] | undefined): string {
@@ -65,31 +61,6 @@ function getOpenIntentTarget(openIntent: WorkspaceOpenIntent): WorkspaceTabTarge
   return { kind: "draft", draftId: openIntent.draftId };
 }
 
-// COMPAT(workspace-open-url): added in v0.12.0, remove after 2027-01-22.
-// Bookmarks and older clients still send ?open=; internal navigation uses pending model state.
-function stripOpenSearchParamFromBrowserUrl() {
-  if (!isWeb || typeof window === "undefined") {
-    return;
-  }
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has("open")) {
-    return;
-  }
-  url.searchParams.delete("open");
-  replaceBrowserRouteWithCanonicalHostWorkspaceRoute(`${url.pathname}${url.search}${url.hash}`);
-}
-
-function clearConsumedOpenIntent(input: {
-  navigation: { setParams: (params: { open?: string | undefined }) => void };
-}) {
-  input.navigation.setParams({ open: undefined });
-  if (isWeb) {
-    // Expo commits the incoming browser URL after setParams. Strip the consumed legacy input
-    // after that commit so it cannot be restored into the address bar and replayed on reload.
-    window.setTimeout(stripOpenSearchParamFromBrowserUrl, 0);
-  }
-}
-
 export default function HostWorkspaceIndexRoute() {
   return (
     <HostRouteBootstrapBoundary>
@@ -99,7 +70,11 @@ export default function HostWorkspaceIndexRoute() {
 }
 
 function HostWorkspaceRouteContent() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<
+    NavigationProp<{
+      "workspace/[workspaceId]/index": { serverId: string; workspaceId: string; open?: string };
+    }>
+  >();
   const params = useLocalSearchParams<{
     serverId?: string | string[];
     workspaceId?: string | string[];
@@ -115,12 +90,6 @@ function HostWorkspaceRouteContent() {
   // phone, where the sidebar only demands while its panel is active. Without demand the deck
   // waits on workspace hydration that never starts.
   useDirectoryDemand(serverId);
-  useEffect(() => {
-    if (!serverId || !workspaceId) {
-      return;
-    }
-    stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit();
-  }, [serverId, workspaceId]);
 
   useLayoutEffect(() => {
     if (!openValue || !serverId || !workspaceId) return;
@@ -136,11 +105,7 @@ function HostWorkspaceRouteContent() {
         { openTab: useWorkspaceLayoutStore.getState().deferOpenTab },
       );
     }
-    clearConsumedOpenIntent({
-      navigation: navigation as unknown as {
-        setParams: (params: { open?: string | undefined }) => void;
-      },
-    });
+    navigation.setParams({ open: undefined });
   }, [navigation, openValue, serverId, workspaceId]);
 
   return <WorkspaceDeck />;

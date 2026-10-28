@@ -8,6 +8,7 @@ import { queryClient } from "@/data/query-client";
 import { I18nProvider } from "@/i18n/provider";
 import { installRouteLeavePopStateGuard } from "@/navigation/route-leave-guard";
 import { RootErrorBoundary } from "@/components/root-error-boundary";
+import { isWeb } from "@/constants/platform";
 
 // Keep Expo's platform filtering, route root, and lazy import configuration.
 const { ctx: context } = require("expo-router/_ctx") as {
@@ -40,6 +41,7 @@ export function RootRouter({ context: routes }: Pick<ComponentProps<typeof ExpoR
               {/* Recreate the router at a safe destination before a failed route can mount. */}
               <ExpoRoot
                 context={routes}
+                browserHistoryEnabled={!isWeb}
                 location={generation === 0 ? undefined : "/open-project"}
               />
             </Head.Provider>
