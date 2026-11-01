@@ -137,12 +137,21 @@ if [[ -n "$staged_install_dir" ]]; then
   exit 0
 fi
 
-for dependency_command in tsc cross-env expo electron-builder; do
-  if [[ ! -x "$repo_root/node_modules/.bin/$dependency_command" ]]; then
-    echo "Dependencies are missing or incomplete. Run mise exec -- npm ci before this task." >&2
-    exit 1
-  fi
+dependencies_missing() {
+  echo "Dependencies are missing or incomplete. Run mise exec -- npm ci before this task." >&2
+  exit 1
+}
+
+for dependency_command in tsc cross-env expo; do
+  [[ -x "$repo_root/node_modules/.bin/$dependency_command" ]] || dependencies_missing
 done
+
+# build:desktop runs electron-builder from the desktop workspace, where npm puts
+# both bin directories on PATH. Lockfile changes move it between the two.
+if [[ ! -x "$repo_root/packages/desktop/node_modules/.bin/electron-builder" &&
+  ! -x "$repo_root/node_modules/.bin/electron-builder" ]]; then
+  dependencies_missing
+fi
 
 if [[ "$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null || true)" == "1" ]]; then
   electron_arch="arm64"
