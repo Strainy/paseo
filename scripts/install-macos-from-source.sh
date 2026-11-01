@@ -164,6 +164,9 @@ fi
 built_app="$repo_root/packages/desktop/release/$app_output_dir/Paseo.app"
 
 echo "Building Paseo.app for $electron_arch from $repo_root"
+# electron-builder 26.18 skips signing when it finds no identity, which leaves
+# only Electron's linker signature and fails the strict verify below. The "-"
+# identity asks it for an ad-hoc signature instead.
 (
   cd "$repo_root"
   PASEO_DESKTOP_SMOKE=1 \
@@ -172,6 +175,7 @@ echo "Building Paseo.app for $electron_arch from $repo_root"
       --mac \
       "--$electron_arch" \
       --dir \
+      -c.mac.identity=- \
       -c.mac.notarize=false \
       -c.mac.hardenedRuntime=false
 )
