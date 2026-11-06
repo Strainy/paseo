@@ -301,6 +301,10 @@ left = anchorRect.x - hostRect.x;
 bottom = hostRect.height - (anchorRect.y - hostRect.y) + offset;
 ```
 
+On web, a portal into `overlay-root` measures it with `readOverlayRootHeight`. Do not use
+the `Dimensions` window height as the host height: in an iOS Home Screen app the overlay
+root is taller by the status bar ([development.md](development.md#app-web-deploys)).
+
 Do this before adding any platform offset. The app draws edge-to-edge on Android, so
 `measureInWindow`, touch `pageY`, and a full-screen `Modal` all share one coordinate
 space that starts at the screen top. Do not add `StatusBar.currentHeight` to an anchor:
@@ -443,7 +447,7 @@ Before you write a new one, ask:
    `anchorRect` and `contentSize` for positioning → apply Gotcha 5 (return
    null until anchor, then opacity-0 until contentSize). If no — content has
    a known fixed max height — you might be able to use bottom-anchored
-   positioning (`bottom: windowHeight - anchor.y + gap`) and skip the
+   positioning (`bottom: hostHeight - anchor.y + gap`) and skip the
    `contentSize` round-trip entirely. **But only if the height is genuinely
    bounded**. Verify before you commit.
 
