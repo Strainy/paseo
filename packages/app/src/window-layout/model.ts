@@ -28,6 +28,20 @@ export function resolveSafeAreaInsets<Insets extends { bottom: number }>(
     : systemInsets;
 }
 
+/** iPhones with a notch or Dynamic Island report a status-bar inset at least this tall. */
+const CUTOUT_STATUS_BAR_INSET = 44;
+/** How far the status-bar safe area reaches below the notch or Dynamic Island. */
+const CUTOUT_CLEARANCE = 10;
+
+/**
+ * An installed iPhone web app starts its content at the bottom of the notch or Dynamic
+ * Island, not at the bottom of the status-bar safe area. Shorter insets come from status
+ * bars without a cutout and stay whole.
+ */
+export function resolveHomeScreenTopInset(top: number): number {
+  return top >= CUTOUT_STATUS_BAR_INSET ? top - CUTOUT_CLEARANCE : top;
+}
+
 export interface DesktopDivisionLayout {
   sidebarWidth: number;
   gap: number;
