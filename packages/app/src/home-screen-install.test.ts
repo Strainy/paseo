@@ -16,6 +16,8 @@ describe("Home Screen install behind a sign-in proxy", () => {
     const icon = readFileSync(new URL("../public/apple-touch-icon.png", import.meta.url));
     const tag = linkTag("apple-touch-icon");
 
+    // The PNG header stores width and height at bytes 16 and 20.
+    expect([icon.readUInt32BE(16), icon.readUInt32BE(20)]).toEqual([180, 180]);
     expect(tag).toContain('sizes="180x180"');
     expect(tag).toContain(`href="data:image/png;base64,${icon.toString("base64")}"`);
   });
