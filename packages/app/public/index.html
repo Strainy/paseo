@@ -49,6 +49,28 @@
         min-height: 0;
         overflow: hidden;
       }
+      /* An iOS Home Screen web app with the black-translucent status bar draws from the
+         top of the screen but sizes its layout viewport without the status bar (WebKit
+         bug 301994), so height: 100% and fixed inset: 0 stop short by the top inset.
+         100lvh spans the screen there. The min() keeps the height right if WebKit fixes
+         the viewport, and on installs made with an opaque status bar, where 100lvh
+         overshoots (WebKit bug 316008). The document itself grows, not a fixed layer
+         over it, so keyboard and focus reveals can reach the band below the layout
+         viewport; useStandaloneScrollReset returns the document to the top afterwards.
+         The html height is important because the web terminal writes an inline
+         height: 100% on html while it is mounted. Full-screen fixed layers need the
+         height too: the overlay root, and the animation and content layers of React
+         Native Web's Modal, which it portals into an unnamed div on body. */
+      @media (display-mode: standalone) {
+        html {
+          height: min(100lvh, calc(100% + env(safe-area-inset-top))) !important;
+        }
+        #overlay-root,
+        body > div:not([id]) > div:has(> div > [aria-modal="true"]),
+        body > div:not([id]) > div > div > [aria-modal="true"] {
+          height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+        }
+      }
     </style>
     <style>
       button,
