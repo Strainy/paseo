@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { HomeScreenSafeAreaInsets } from "./home-screen-insets";
 
 export { useWindowLayout } from "./context";
 export { WindowLayoutActions, WindowLayoutActionsHost } from "./actions";
@@ -12,5 +11,5 @@ export {
 export type { DesktopDivisionLayout, WindowLayout, WindowLayoutRect } from "./model";
 
 export function WindowLayoutProvider({ children }: { children: ReactNode }) {
-  return <HomeScreenSafeAreaInsets>{children}</HomeScreenSafeAreaInsets>;
+  return children;
 }
