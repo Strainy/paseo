@@ -63,7 +63,12 @@ import {
 } from "@/components/adaptive-modal-sheet";
 import { FloatingSurface } from "@/components/ui/floating";
 import { useDismissKeyboardOnOpen } from "@/components/ui/keyboard-dismiss";
-import { getOverlayRoot, OverlayLayerProvider, useOverlayLayer } from "@/lib/overlay-root";
+import {
+  getOverlayRoot,
+  OverlayLayerProvider,
+  readOverlayRootHeight,
+  useOverlayLayer,
+} from "@/lib/overlay-root";
 import { density, densityIconBox } from "@/styles/density";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { buildDesktopFrameStyle } from "./combobox-frame-style";
@@ -397,7 +402,8 @@ interface DesktopPositionInput {
   referenceAtOrigin: boolean;
   desktopContentWidth: number | null;
   windowWidth: number;
-  windowHeight: number;
+  /** Height of the layer the desktop overlay fills; bottom offsets resolve against it. */
+  overlayHeight: number;
   collisionPadding: number;
   floatingTop: number | null;
   floatingLeft: number | null;
@@ -446,6 +452,15 @@ function resolvePositionReady(
   return floatingLeft !== null && floatingTop !== null && (hasNonZeroFloating || referenceAtOrigin);
 }
 
+/** Web portals into overlay-root, which can be taller than the window (readOverlayRootHeight). */
+function resolveDesktopOverlayHeight(input: {
+  isOpen: boolean;
+  isMobile: boolean;
+  windowHeight: number;
+}): number {
+  return isWeb && input.isOpen && !input.isMobile ? readOverlayRootHeight() : input.windowHeight;
+}
+
 function computeDesktopPosition(input: DesktopPositionInput): DesktopPositionResult {
   const {
     isDesktopAboveSearch,
@@ -453,7 +468,7 @@ function computeDesktopPosition(input: DesktopPositionInput): DesktopPositionRes
     referenceLeft,
     desktopContentWidth,
     windowWidth,
-    windowHeight,
+    overlayHeight,
     collisionPadding,
     floatingLeft,
     floatingStyles,
@@ -463,7 +478,7 @@ function computeDesktopPosition(input: DesktopPositionInput): DesktopPositionRes
 
   const desktopAboveSearchBottom =
     isDesktopAboveSearch && referenceTop !== null
-      ? Math.max(windowHeight - referenceTop, collisionPadding)
+      ? Math.max(overlayHeight - referenceTop, collisionPadding)
       : null;
   const useMeasuredTopStartPosition = shouldUseMeasuredTopStart(input);
   const clampedMeasuredTopStartLeft =
@@ -475,7 +490,7 @@ function computeDesktopPosition(input: DesktopPositionInput): DesktopPositionRes
       : null;
   const measuredTopStartBottom =
     useMeasuredTopStartPosition && referenceTop !== null
-      ? Math.max(windowHeight - referenceTop + 5, collisionPadding)
+      ? Math.max(overlayHeight - referenceTop + 5, collisionPadding)
       : null;
 
   const resolvedPositionReady = resolvePositionReady(
@@ -1419,7 +1434,7 @@ export function Combobox({
     referenceAtOrigin,
     desktopContentWidth,
     windowWidth,
-    windowHeight,
+    overlayHeight: resolveDesktopOverlayHeight({ isOpen, isMobile, windowHeight }),
     collisionPadding,
     floatingTop,
     floatingLeft,

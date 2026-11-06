@@ -107,3 +107,38 @@ export function resolveComposerSlotCapacity(
   if (layout.fullscreen) return sizing.viewportHeight;
   return resolveInlineComposerCapacity(sizing.capacity, layout.compact);
 }
+
+export interface ComposerSlotFrame {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  /** The safe-area bottom while nothing covers the viewport; a keyboard covers it otherwise. */
+  paddingBottom: number;
+}
+
+export interface VisibleViewport {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  /** No keyboard or zoom covers part of the layout viewport. */
+  unobscured: boolean;
+}
+
+/** The part of the dock surface the visible viewport shows, for a fixed box. */
+export function resolveVisibleSurfaceFrame(
+  surface: { top: number; left: number; right: number; bottom: number },
+  viewport: VisibleViewport,
+  safeAreaBottom: number,
+): ComposerSlotFrame {
+  const top = Math.max(viewport.top, surface.top);
+  const left = Math.max(viewport.left, surface.left);
+  return {
+    top,
+    left,
+    width: Math.max(0, Math.min(viewport.left + viewport.width, surface.right) - left),
+    height: Math.max(0, Math.min(viewport.top + viewport.height, surface.bottom) - top),
+    paddingBottom: viewport.unobscured ? safeAreaBottom : 0,
+  };
+}
