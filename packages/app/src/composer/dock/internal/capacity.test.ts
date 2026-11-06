@@ -5,6 +5,7 @@ import {
   resolveComposerSlotCapacity,
   resolveInlineComposerCapacity,
   resolveComposerCapacity,
+  resolveVisibleSurfaceFrame,
   updateComposerCapacity,
 } from "./capacity";
 
@@ -221,5 +222,39 @@ describe("composer viewport", () => {
         centered: false,
       }),
     ).toBe(95);
+  });
+});
+
+describe("fullscreen composer frame", () => {
+  // A 402x874 pt iPhone Home Screen app: the page reaches the screen bottom while the
+  // browser reports a viewport 62 pt short.
+  const surface = { top: 0, left: 0, right: 402, bottom: 874 };
+
+  it("reaches the screen bottom and pads the safe area while nothing covers the viewport", () => {
+    const viewport = {
+      top: 0,
+      left: 0,
+      width: 402,
+      height: Number.POSITIVE_INFINITY,
+      unobscured: true,
+    };
+    expect(resolveVisibleSurfaceFrame(surface, viewport, 34)).toEqual({
+      top: 0,
+      left: 0,
+      width: 402,
+      height: 874,
+      paddingBottom: 34,
+    });
+  });
+
+  it("ends at the keyboard without the safe area the keyboard covers", () => {
+    const viewport = { top: 0, left: 0, width: 402, height: 476, unobscured: false };
+    expect(resolveVisibleSurfaceFrame(surface, viewport, 34)).toEqual({
+      top: 0,
+      left: 0,
+      width: 402,
+      height: 476,
+      paddingBottom: 0,
+    });
   });
 });

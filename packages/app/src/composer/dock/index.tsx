@@ -3,11 +3,13 @@ export { ComposerFullscreenBody, ComposerFullscreenFooter } from "./internal/ful
 import { ScrollView } from "@/components/ui/scroll-view";
 import { useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
-import { resolveInlineComposerCapacity } from "./internal/capacity";
+import { resolveComposerBottomPlacement, resolveInlineComposerCapacity } from "./internal/capacity";
 import { useFullscreenSlotFrame } from "./internal/fullscreen";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { HEADER_INNER_HEIGHT } from "@/constants/layout";
+import { SPACING } from "@/styles/theme";
 
 interface ComposerDockProps {
   children: [ReactNode, ReactNode, ReactNode?];
@@ -24,7 +26,20 @@ export function ComposerDock({
   const compact = useIsCompactFormFactor();
   const [surfaceSize, setSurfaceSize] = useState<{ width: number; height: number }>();
   const surfaceRef = useRef<View>(null);
-  const fullscreenFrame = useFullscreenSlotFrame(fullscreen, surfaceRef, surfaceSize);
+  const safeAreaBottom = useSafeAreaInsets().bottom;
+  const fullscreenFrame = useFullscreenSlotFrame({
+    active: fullscreen,
+    surfaceRef,
+    surfaceSize,
+    safeAreaBottom,
+  });
+  const resting = useMemo(
+    () => ({
+      paddingBottom: resolveComposerBottomPlacement({ safeAreaBottom, contentSpacing: SPACING[4] })
+        .restingPadding,
+    }),
+    [safeAreaBottom],
+  );
   const constraint = useMemo(
     () => ({ maxHeight: resolveInlineComposerCapacity(surfaceSize?.height, compact) }),
     [surfaceSize?.height, compact],
@@ -59,7 +74,9 @@ export function ComposerDock({
       <View style={styles.content}>{content}</View>
       <View
         style={
-          fullscreen ? [styles.fullscreenComposer, fullscreenFrame] : [styles.composer, constraint]
+          fullscreen
+            ? [styles.fullscreenComposer, fullscreenFrame]
+            : [styles.composer, resting, constraint]
         }
       >
         {composer}
@@ -72,11 +89,12 @@ export function ComposerDock({
 const styles = StyleSheet.create((theme) => ({
   surface: { flex: 1, overflow: "hidden" },
   content: { flex: 1, justifyContent: "flex-end" },
-  composer: { width: "100%", flexShrink: 1, paddingBottom: theme.spacing[4] },
+  composer: { width: "100%", flexShrink: 1 },
   // Fixed, not absolute: a touch pan that starts inside an overflow-hidden ancestor
   // never reaches the zoomed visual viewport, while a fixed box chains to the viewport
   // directly. React Native Web renders `fixed`; React Native's style type omits it.
-  fullscreenComposer: { position: "fixed" as "absolute" },
+  // The surface colour fills the safe-area padding the frame adds below the composer.
+  fullscreenComposer: { position: "fixed" as "absolute", backgroundColor: theme.colors.surface1 },
   centered: {
     flex: 1,
     alignItems: "center",
