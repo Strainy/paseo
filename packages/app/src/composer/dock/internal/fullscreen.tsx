@@ -1,5 +1,10 @@
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
+import {
+  resolveVisibleSurfaceFrame,
+  type ComposerSlotFrame,
+  type VisibleViewport,
+} from "./capacity";
 
 /** The editing region of a composer; see the native file for the keyboard contract. */
 export function ComposerFullscreenBody({
@@ -16,24 +21,19 @@ export function ComposerFullscreenFooter({ children, ...props }: ViewProps) {
   return <View {...props}>{children}</View>;
 }
 
-export interface ComposerSlotFrame {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
 /**
  * Where a fullscreen composer sits, in layout-viewport coordinates for a fixed box: the
  * part of the dock surface the browser's visible viewport shows. A mobile browser
  * keyboard shrinks or pans that viewport without resizing the page, so the frame
  * follows it instead of the layout.
  */
-export function useFullscreenSlotFrame(
-  active: boolean,
-  surfaceRef: RefObject<View | null>,
-  surfaceSize: { width: number; height: number } | undefined,
-): ComposerSlotFrame | undefined {
+export function useFullscreenSlotFrame(input: {
+  active: boolean;
+  surfaceRef: RefObject<View | null>;
+  surfaceSize: { width: number; height: number } | undefined;
+  safeAreaBottom: number;
+}): ComposerSlotFrame | undefined {
+  const { active, surfaceRef, surfaceSize, safeAreaBottom } = input;
   const [frame, setFrame] = useState<ComposerSlotFrame>();
   useLayoutEffect(() => {
     if (!active) {
@@ -43,7 +43,13 @@ export function useFullscreenSlotFrame(
     const update = () => {
       const surface = surfaceRef.current as unknown as HTMLElement | null;
       if (!surface) return;
-      setFrame(resolveVisibleSurfaceFrame(surface.getBoundingClientRect(), readVisibleViewport()));
+      setFrame(
+        resolveVisibleSurfaceFrame(
+          surface.getBoundingClientRect(),
+          readVisibleViewport(),
+          safeAreaBottom,
+        ),
+      );
     };
     const visualViewport = window.visualViewport;
     update();
@@ -55,31 +61,27 @@ export function useFullscreenSlotFrame(
       visualViewport?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [active, surfaceRef, surfaceSize]);
+  }, [active, surfaceRef, surfaceSize, safeAreaBottom]);
   return frame;
 }
 
-function readVisibleViewport() {
+/**
+ * An iOS Home Screen web app reports a viewport short by the status bar while
+ * public/index.html sizes the app to the screen, so there an unobscured viewport does not
+ * bound the surface.
+ */
+function readVisibleViewport(): VisibleViewport {
   const viewport = window.visualViewport;
-  return {
-    top: viewport?.offsetTop ?? 0,
-    left: viewport?.offsetLeft ?? 0,
-    width: viewport?.width ?? window.innerWidth,
-    height: viewport?.height ?? window.innerHeight,
-  };
-}
-
-function resolveVisibleSurfaceFrame(
-  surface: { top: number; left: number; right: number; bottom: number },
-  viewport: { top: number; left: number; width: number; height: number },
-): ComposerSlotFrame {
-  const top = Math.max(viewport.top, surface.top);
-  const left = Math.max(viewport.left, surface.left);
+  const top = viewport?.offsetTop ?? 0;
+  const height = viewport?.height ?? window.innerHeight;
+  const unobscured = top <= 0 && (viewport?.scale ?? 1) <= 1 && height >= window.innerHeight;
+  const standalone = window.matchMedia("(display-mode: standalone)").matches;
   return {
     top,
-    left,
-    width: Math.max(0, Math.min(viewport.left + viewport.width, surface.right) - left),
-    height: Math.max(0, Math.min(viewport.top + viewport.height, surface.bottom) - top),
+    left: viewport?.offsetLeft ?? 0,
+    width: viewport?.width ?? window.innerWidth,
+    height: unobscured && standalone ? Number.POSITIVE_INFINITY : height,
+    unobscured,
   };
 }
 
