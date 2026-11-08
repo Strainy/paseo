@@ -29,6 +29,15 @@ export function getOverlayRoot(): HTMLElement {
   return el;
 }
 
+/**
+ * The overlay root's height, the space a bottom offset inside it resolves against. In an
+ * iOS Home Screen web app, public/index.html sizes the root past the window height that
+ * `Dimensions` reports.
+ */
+export function readOverlayRootHeight(): number {
+  return getOverlayRoot().getBoundingClientRect().height;
+}
+
 export const WEB_SURFACE_PLANE = {
   browser: 0,
   overlay: 1,

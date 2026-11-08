@@ -745,6 +745,24 @@ PWA install metadata lives in `packages/app/public/manifest.json` and is linked
 from `packages/app/public/index.html`. Keep the install icons in `public/` so
 Cloudflare serves them from stable root URLs after `expo export`.
 
+An installed iOS Home Screen app draws under the black-translucent status bar,
+but WebKit sizes its layout viewport without the status bar ([bug
+301994](https://bugs.webkit.org/show_bug.cgi?id=301994)). `height: 100%`,
+`position: fixed; inset: 0`, `window.innerHeight`, `visualViewport`, and React
+Native Web's `Dimensions` window height all stop short of the screen bottom by
+the top safe-area inset. In standalone mode `index.html` grows the document,
+`overlay-root`, and React Native Web's `Modal` layers to the screen. The taller
+document gains a scroll range that keyboard and focus reveals scroll into and
+`overflow: hidden` cannot undo, so `useStandaloneScrollReset` returns it to the
+top whenever no text field holds the keyboard. The JavaScript heights stay
+short. A new full-screen fixed layer needs the same CSS rule. Place
+bottom-anchored overlays against their host's measured height, not the window
+height
+([floating-panels.md](floating-panels.md#gotcha-4--host-relative-positioning-before-platform-offsets)).
+Changing the status-bar style only reaches new installs: iOS fixes it when the
+app is added to the Home Screen. Desktop browsers cannot reproduce this; check
+changes to the shell on an iPhone with the app installed.
+
 Do not add service-worker caching casually. Paseo is a live control surface for
 agents, and an aggressive service worker can strand installed users on stale web
 code. If offline behavior becomes a product requirement, add it deliberately

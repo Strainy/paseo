@@ -8,6 +8,7 @@ import { queryClient } from "@/data/query-client";
 import { I18nProvider } from "@/i18n/provider";
 import { RootErrorBoundary } from "@/components/root-error-boundary";
 import { isWeb } from "@/constants/platform";
+import { useStandaloneScrollReset } from "@/hooks/use-standalone-scroll-reset";
 
 // Keep Expo's platform filtering, route root, and lazy import configuration.
 const { ctx: context } = require("expo-router/_ctx") as {
@@ -25,6 +26,7 @@ export function RootApp() {
 export function RootRouter({ context: routes }: Pick<ComponentProps<typeof ExpoRoot>, "context">) {
   const [generation, setGeneration] = useState(0);
   const reload = useCallback(() => setGeneration((value) => value + 1), []);
+  useStandaloneScrollReset();
 
   return (
     <QueryClientProvider client={queryClient}>
