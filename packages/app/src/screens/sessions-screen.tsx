@@ -2,8 +2,8 @@ import { useMemo, useState, useCallback, useEffect, type ReactElement } from "re
 import { View, Text } from "react-native";
 import { useIsFocused } from "expo-router/react-navigation";
 import { router } from "expo-router";
-import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
-import { CalendarClock, ChevronLeft, Import } from "lucide-react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { ChevronLeft, Import } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -12,9 +12,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
 import { HostFilter } from "@/components/hosts/host-filter";
-import { extraMutedIconColorMapping } from "@/components/ui/icon-button-chrome";
-import { paneContentToolbarIconSize, ToolbarButton } from "@/components/ui/pane-content-toolbar";
-import { useIsCompactFormFactor } from "@/constants/layout";
+import { Switch } from "@/components/ui/switch";
 import { useAppSettings } from "@/hooks/use-settings";
 import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
@@ -22,8 +20,6 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
-
-const ThemedCalendarClock = withUnistyles(CalendarClock);
 
 /** Long enough that a typed word is one request, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 200;
@@ -66,31 +62,32 @@ function resolveEmptyText(input: {
   return "No sessions for this host";
 }
 
-/** History's per-device "Hide scheduled runs" toggle, shown when every target host can filter. */
+/** History's per-device "Hide scheduled runs" switch, shown when every target host can filter. */
 function HideScheduledRunsToggle({ visible }: { visible: boolean }): ReactElement | null {
   const { t } = useTranslation();
-  const isCompact = useIsCompactFormFactor();
   const { settings, updateSettings } = useAppSettings();
-  const handlePress = useCallback(() => {
-    void updateSettings((current) => ({
-      historyHideScheduledRuns: !current.historyHideScheduledRuns,
-    }));
-  }, [updateSettings]);
+  const value = settings.historyHideScheduledRuns;
+  const setValue = useCallback(
+    (next: boolean) => {
+      void updateSettings({ historyHideScheduledRuns: next });
+    },
+    [updateSettings],
+  );
 
   if (!visible) return null;
+  const label = t("sessions.actions.hideScheduledRuns");
   return (
-    <ToolbarButton
-      compact={isCompact}
-      label={t("sessions.actions.hideScheduledRuns")}
-      selected={settings.historyHideScheduledRuns}
-      onPress={handlePress}
-      testID="sessions-hide-scheduled-runs"
-    >
-      <ThemedCalendarClock
-        size={paneContentToolbarIconSize(isCompact)}
-        uniProps={extraMutedIconColorMapping}
+    <View style={styles.scheduledToggle}>
+      <Text style={styles.scheduledToggleLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Switch
+        value={value}
+        onValueChange={setValue}
+        accessibilityLabel={label}
+        testID="sessions-hide-scheduled-runs"
       />
-    </ToolbarButton>
+    </View>
   );
 }
 
@@ -279,6 +276,16 @@ const styles = StyleSheet.create((theme) => ({
       md: theme.spacing[6],
     },
     paddingTop: theme.spacing[4],
+  },
+  scheduledToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    flexShrink: 0,
+  },
+  scheduledToggleLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   emptyContainer: {
     flex: 1,
