@@ -25,6 +25,7 @@ import type {
   UpdateScheduleInput,
   UpdateScheduleNewAgentConfig,
 } from "@getpaseo/protocol/schedule/types";
+import { SCHEDULE_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
 
 const SCHEDULE_TICK_INTERVAL_MS = 1000;
@@ -1072,7 +1073,7 @@ export class ScheduleService {
         workspaceId: workspace.workspaceId,
         title: resolveScheduleAgentTitle(config, schedule.prompt),
         labels: {
-          "paseo.schedule-id": schedule.id,
+          [SCHEDULE_ID_LABEL]: schedule.id,
           "paseo.schedule-run": runId,
         },
         mode: config.modeId,

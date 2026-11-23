@@ -104,7 +104,7 @@ import { toWireDaemonConfig, type DaemonConfigStore } from "./daemon-config-stor
 import { releaseWorkspaceServicePortPlan } from "./workspace-service-port-registry.js";
 import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-utils";
 import { getAgentStatusPriority } from "@getpaseo/protocol/agent-state-bucket";
-import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import { getParentAgentIdFromLabels, isScheduleRunAgent } from "@getpaseo/protocol/agent-labels";
 import { applyRecordPatch } from "./record-patch.js";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
 import {
@@ -6245,6 +6245,9 @@ export class Session {
           agent.workspaceId != null &&
           activePlacementsByWorkspaceId.has(agent.workspaceId),
       );
+    }
+    if (request.type === "fetch_agent_history_request" && request.excludeScheduleRuns) {
+      agents = agents.filter((agent) => !isScheduleRunAgent(agent));
     }
 
     const placementByWorkspaceId = new Map<string, Promise<ProjectPlacementPayload | null>>();

@@ -42,4 +42,6 @@ Each new-agent schedule run creates a workspace. **Archive on finish** is on by 
 
 To keep runs available, turn off **Archive on finish**: open the schedule in the app's Schedules view, turn off the switch, and save; from the CLI, pass `--no-archive-on-finish`; over MCP, pass `archiveOnFinish: false`. Paseo keeps each run's workspace and agent active until you archive them; runs that fail before creating an agent are still cleaned up. This option also applies to **Project directory** isolation; archiving that workspace leaves the project directory in place.
 
+History lists every run's agent, archived or not. To leave them out, turn off the **Show scheduled runs** switch at the top of History. The choice is saved per device and needs a host on v0.17.4 or later.
+
 The stored option is `target.config.archiveOnFinish`, a boolean that defaults to `true` when omitted. Heartbeats use an existing agent and do not have this option.

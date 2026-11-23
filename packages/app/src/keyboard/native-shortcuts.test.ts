@@ -183,15 +183,20 @@ describe("hardware source adapter", () => {
   it("claims the Shift and Option shortcuts a focused text control would otherwise type", async () => {
     const { createHardwareKeyboardSource } = await import("./internal/sources/native");
     const { focusSurfaces } = await import("./internal/focus-surfaces");
+    // Workspace switching is Option+[ / ], which types a quote, so it is claimed whenever the
+    // command center is closed. The rest of this test is about focus-dependent claims.
+    const workspaceSwitching = ["Alt+BracketLeft", "Alt+BracketRight"];
+    let allClaimed: string[] = [];
     let claimed: string[] = [];
     const source = createHardwareKeyboardSource({
       subscribe: () => () => {},
       setOverlayKeys() {},
       setClaimedShortcuts(shortcuts) {
-        claimed = shortcuts
+        allClaimed = shortcuts
           .map(({ code, shift, alt }) => [alt && "Alt", shift && "Shift", code])
           .map((parts) => parts.filter(Boolean).join("+"))
           .sort();
+        claimed = allClaimed.filter((shortcut) => !workspaceSwitching.includes(shortcut));
       },
     });
     source.publishPolicy({
@@ -217,12 +222,12 @@ describe("hardware source adapter", () => {
       for (const listener of commandCenterListeners) listener();
     };
     // iPad tab switching uses Cmd+Shift+[ / ], which no text control types.
-    expect(claimed).toEqual([]);
+    expect(allClaimed).toEqual(workspaceSwitching);
 
     const releaseComposer = focusSurfaces.declare("message-input");
     expect(claimed).toEqual(["Shift+Tab"]);
     setCommandCenterOpen(true);
-    expect(claimed).toEqual([]);
+    expect(allClaimed).toEqual([]);
     setCommandCenterOpen(false);
     expect(claimed).toEqual(["Shift+Tab"]);
     releaseComposer();

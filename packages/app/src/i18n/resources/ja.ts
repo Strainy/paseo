@@ -312,6 +312,7 @@ export const ja: TranslationResources = {
     actions: {
       loadMore: "さらに読み込む",
       clearSearch: "検索をクリア",
+      showScheduledRuns: "スケジュール実行を表示",
     },
   },
   agentList: {

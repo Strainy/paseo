@@ -1,6 +1,8 @@
 import type { AgentAddress } from "./addresses.js";
 export const PARENT_SERVER_ID_LABEL = "paseo.parent-server-id";
 export const PARENT_AGENT_ID_LABEL = "paseo.parent-agent-id";
+/** Set on every agent a new-agent schedule run creates. */
+export const SCHEDULE_ID_LABEL = "paseo.schedule-id";
 const OPEN_AGENT_TAB_LABEL_PREFIX = "paseo.open-agent-tab.";
 
 export function getOpenAgentTabLabel(clientId: string): string {
@@ -24,6 +26,10 @@ export function getParentAgentIdFromLabels(labels: Record<string, unknown> | nul
 
 export function isDelegatedAgent(agent: AgentLabelSource): boolean {
   return getParentAgentIdFromLabels(agent.labels) !== null;
+}
+
+export function isScheduleRunAgent(agent: AgentLabelSource): boolean {
+  return typeof agent.labels?.[SCHEDULE_ID_LABEL] === "string";
 }
 
 export function hasOpenAgentTab(labels: Record<string, unknown> | null | undefined): boolean {

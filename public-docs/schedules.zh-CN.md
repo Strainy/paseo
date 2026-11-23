@@ -40,4 +40,6 @@ cron 是标准的节奏表示。CLI 接受 `5m` 或 `1h` 这样的简单预设�
 
 要保留运行结果，请关闭 **Archive on finish**：在应用的定时任务视图中打开该定时任务，关闭该开关并保存；在 CLI 中传入 `--no-archive-on-finish`；通过 MCP 传入 `archiveOnFinish: false`。Paseo 会让每次运行的工作区和 Agent 保持活跃，直到你手动归档；在创建 Agent 之前就失败的运行仍会被清理。该选项同样适用于 **Project directory** 隔离；归档该工作区不会删除项目目录。
 
+历史记录会列出每次运行的 Agent，无论是否已归档。要隐藏它们，在历史记录顶部关闭 **显示定时任务运行** 开关。该选择按设备保存，需要主机为 v0.17.4 或更高版本。
+
 存储的选项是 `target.config.archiveOnFinish`，一个布尔值，省略时默认为 `true`。heartbeat 使用已有的 Agent，没有这个选项。

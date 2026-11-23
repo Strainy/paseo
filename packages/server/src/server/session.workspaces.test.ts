@@ -3253,6 +3253,71 @@ test("fetch_agent_history_request pages archived historical rows separately", as
   expect(session.agentUpdates.hasSubscription()).toBe(false);
 });
 
+test("fetch_agent_history_request leaves out schedule runs when asked", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = createSessionForWorkspaceTests();
+  const historyCwd = path.resolve("/tmp/history-schedules");
+  const project = createPersistedProjectRecord({
+    projectId: "proj-history-schedules",
+    rootPath: historyCwd,
+    kind: "non_git",
+    displayName: "history",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-history-schedules",
+    projectId: project.projectId,
+    cwd: historyCwd,
+    kind: "directory",
+    displayName: "history",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+
+  session.emit = (message) => {
+    if (isSessionOutboundMessage(message)) emitted.push(message);
+  };
+  session.projectRegistry.get = async () => project;
+  session.workspaceRegistry.listAll = session.workspaceRegistry.listActive = async () => [
+    workspace,
+  ];
+  session.workspaceRegistry.get = async () => workspace;
+  session.listAgentPayloads = async () => [
+    makeAgent({
+      id: "manual",
+      cwd: historyCwd,
+      workspaceId: workspace.workspaceId,
+      status: "idle",
+      updatedAt: "2026-03-01T12:00:00.000Z",
+    }),
+    makeAgent({
+      id: "scheduled",
+      cwd: historyCwd,
+      workspaceId: workspace.workspaceId,
+      status: "idle",
+      updatedAt: "2026-03-01T13:00:00.000Z",
+      labels: { "paseo.schedule-id": "schedule-1", "paseo.schedule-run": "run-1" },
+    }),
+  ];
+
+  const historyIds = async (requestId: string, excludeScheduleRuns?: boolean) => {
+    await session.handleMessage({
+      type: "fetch_agent_history_request",
+      requestId,
+      ...(excludeScheduleRuns === undefined ? {} : { excludeScheduleRuns }),
+      page: { limit: 25 },
+    });
+    const response = filterByType(emitted, "fetch_agent_history_response").find(
+      (message) => message.payload.requestId === requestId,
+    );
+    return response?.payload.entries.map((entry) => entry.agent.id).sort();
+  };
+
+  expect(await historyIds("req-all")).toEqual(["manual", "scheduled"]);
+  expect(await historyIds("req-filtered", true)).toEqual(["manual"]);
+});
+
 test("fetch_agent_history_request filters across history and paginates chronologically", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = createSessionForWorkspaceTests();

@@ -122,6 +122,8 @@ export interface AppSettings {
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
   notifications: NotificationPreferences;
+  /** History lists agents created by schedule runs; off leaves them out. */
+  historyShowScheduledRuns: boolean;
 }
 
 export type AppSettingsUpdate =
@@ -180,6 +182,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
   notifications: DEFAULT_NOTIFICATION_PREFERENCES,
+  historyShowScheduledRuns: true,
 };
 
 export const DEFAULT_APP_SETTINGS: Settings = {
@@ -313,6 +316,7 @@ const StoredAppSettingsSchema = z
       .unknown()
       .transform((value) => normalizeNotificationPreferences(value))
       .catch(DEFAULT_NOTIFICATION_PREFERENCES),
+    historyShowScheduledRuns: z.boolean().catch(true),
     // COMPAT(explorerSidebarRouting): replaced by source-specific side-pane preferences in v0.6.
     openSupportingTabsInSidePanel: z.boolean().optional().catch(undefined),
     // COMPAT(rendererDesktopSettings): these fields used to share this renderer-owned key.

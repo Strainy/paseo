@@ -304,6 +304,18 @@ describe("fetchAgentHistoryPage", () => {
     expect(page.agents.map((agent) => agent.id)).toEqual(["match"]);
   });
 
+  it("asks each host to leave out schedule runs when hiding them", async () => {
+    const client = createClient([historyPayload({ entries: [] })]);
+
+    await fetchAgentHistoryBatch({
+      hosts: [{ serverId: "server-1", serverLabel: "Host 1", client }],
+      cursorByServerId: null,
+      excludeScheduleRuns: true,
+    });
+
+    expect(client.calls[0]?.excludeScheduleRuns).toBe(true);
+  });
+
   it("keeps sessions with the same id on different hosts and sorts by recency", async () => {
     const sharedId = "collision";
     const serverAClient = createClient([

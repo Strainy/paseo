@@ -307,6 +307,7 @@ export const zhCN: TranslationResources = {
     actions: {
       loadMore: "加载更多",
       clearSearch: "清除搜索",
+      showScheduledRuns: "显示定时任务运行",
     },
   },
   agentList: {

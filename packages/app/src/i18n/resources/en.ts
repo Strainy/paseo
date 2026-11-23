@@ -306,6 +306,7 @@ export const en = {
     actions: {
       loadMore: "Load more",
       clearSearch: "Clear search",
+      showScheduledRuns: "Show scheduled runs",
     },
   },
   agentList: {

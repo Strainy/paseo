@@ -307,6 +307,7 @@ export const ar: TranslationResources = {
     actions: {
       loadMore: "تحميل المزيد",
       clearSearch: "مسح البحث",
+      showScheduledRuns: "إظهار التشغيلات المجدولة",
     },
   },
   agentList: {

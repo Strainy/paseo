@@ -12,6 +12,8 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
 import { HostFilter } from "@/components/hosts/host-filter";
+import { Switch } from "@/components/ui/switch";
+import { useAppSettings } from "@/hooks/use-settings";
 import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -60,6 +62,35 @@ function resolveEmptyText(input: {
   return "No sessions for this host";
 }
 
+/** History's per-device "Show scheduled runs" switch, shown when every target host can filter. */
+function ShowScheduledRunsToggle({ visible }: { visible: boolean }): ReactElement | null {
+  const { t } = useTranslation();
+  const { settings, updateSettings } = useAppSettings();
+  const value = settings.historyShowScheduledRuns;
+  const setValue = useCallback(
+    (next: boolean) => {
+      void updateSettings({ historyShowScheduledRuns: next });
+    },
+    [updateSettings],
+  );
+
+  if (!visible) return null;
+  const label = t("sessions.actions.showScheduledRuns");
+  return (
+    <View style={styles.scheduledToggle}>
+      <Text style={styles.scheduledToggleLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Switch
+        value={value}
+        onValueChange={setValue}
+        accessibilityLabel={label}
+        testID="sessions-show-scheduled-runs"
+      />
+    </View>
+  );
+}
+
 export function SessionsScreen() {
   const isFocused = useIsFocused();
 
@@ -79,6 +110,8 @@ function SessionsScreenContent() {
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const historyServerId = selectedHost === ALL_HOSTS_OPTION_ID ? null : selectedHost;
+  const { settings } = useAppSettings();
+  const hideScheduledRuns = !settings.historyShowScheduledRuns;
   const {
     agents,
     hasMore,
@@ -87,12 +120,14 @@ function SessionsScreenContent() {
     isError,
     isSearchSupported,
     isSearchTruncated,
+    isScheduleFilterSupported,
     hostErrors,
     loadMore,
     refreshAll,
   } = useAgentHistory({
     serverId: historyServerId,
     search,
+    hideScheduledRuns,
   });
   const isSearching = isSearchSupported && search.length > 0;
 
@@ -119,7 +154,9 @@ function SessionsScreenContent() {
     isAllHosts: selectedHost === ALL_HOSTS_OPTION_ID,
   });
   const showHostFilter = hosts.length > 1;
-  const showFilterRow = showHostFilter || isSearchSupported;
+  const showFilterRow = [showHostFilter, isSearchSupported, isScheduleFilterSupported].some(
+    Boolean,
+  );
   const showLoadError = isError && agents.length === 0;
 
   const handleBack = useCallback(() => {
@@ -174,6 +211,7 @@ function SessionsScreenContent() {
               hostOptionTestID={sessionsHostOptionTestID}
             />
           ) : null}
+          <ShowScheduledRunsToggle visible={isScheduleFilterSupported} />
         </View>
       ) : null}
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}
@@ -238,6 +276,16 @@ const styles = StyleSheet.create((theme) => ({
       md: theme.spacing[6],
     },
     paddingTop: theme.spacing[4],
+  },
+  scheduledToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    flexShrink: 0,
+  },
+  scheduledToggleLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   emptyContainer: {
     flex: 1,

@@ -2995,6 +2995,7 @@ export class DaemonClient {
       requestId: resolvedRequestId,
       ...(options?.filter ? { filter: options.filter } : {}),
       ...(options?.search ? { search: options.search } : {}),
+      ...(options?.excludeScheduleRuns ? { excludeScheduleRuns: true } : {}),
       ...(options?.sort ? { sort: options.sort } : {}),
       ...(options?.page ? { page: options.page } : {}),
     });
