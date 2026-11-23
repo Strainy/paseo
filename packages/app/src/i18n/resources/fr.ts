@@ -309,6 +309,7 @@ export const fr: TranslationResources = {
     actions: {
       loadMore: "Charger plus",
       clearSearch: "Effacer la recherche",
+      hideScheduledRuns: "Masquer les exécutions planifiées",
     },
   },
   agentList: {

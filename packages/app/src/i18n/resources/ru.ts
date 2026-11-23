@@ -308,6 +308,7 @@ export const ru: TranslationResources = {
     actions: {
       loadMore: "Загрузить ещё",
       clearSearch: "Очистить поиск",
+      hideScheduledRuns: "Скрыть запуски по расписанию",
     },
   },
   agentList: {

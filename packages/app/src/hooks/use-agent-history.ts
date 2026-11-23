@@ -35,6 +35,8 @@ export interface AgentHistoryResult {
   isSearchSupported: boolean;
   /** More sessions matched than the ranked page holds. Narrow the query. */
   isSearchTruncated: boolean;
+  /** False when any target host predates the schedule filter; the screen hides the toggle. */
+  isScheduleFilterSupported: boolean;
   /** The agents answer the previous query; the current one is loading (`keepPreviousResults`). */
   isPreviousResults: boolean;
   /** Hosts that failed while others succeeded. The list still renders. */
@@ -83,9 +85,11 @@ export async function fetchAgentHistoryPage(input: {
   serverId: string;
   cursor: string | null;
   search?: string;
+  excludeScheduleRuns?: boolean;
 }): Promise<AgentHistoryPage> {
   const payload = await input.client.fetchAgentHistory({
     ...(input.search ? { search: input.search } : {}),
+    ...(input.excludeScheduleRuns ? { excludeScheduleRuns: true } : {}),
     sort: AGENT_HISTORY_SORT,
     page: input.cursor
       ? { limit: AGENT_HISTORY_PAGE_LIMIT, cursor: input.cursor }
@@ -168,6 +172,7 @@ export async function fetchAgentHistoryBatch(input: {
   hosts: readonly AgentHistoryHost[];
   cursorByServerId: AgentHistoryCursorByServerId | null;
   search?: string;
+  excludeScheduleRuns?: boolean;
 }): Promise<AgentHistoryBatchPage> {
   const cursorByServerId = input.cursorByServerId ?? {};
   const hasCursorFilter = Object.keys(cursorByServerId).length > 0;
@@ -182,6 +187,7 @@ export async function fetchAgentHistoryBatch(input: {
         serverId: host.serverId,
         cursor: cursorByServerId[host.serverId] ?? null,
         ...(input.search ? { search: input.search } : {}),
+        ...(input.excludeScheduleRuns ? { excludeScheduleRuns: true } : {}),
       });
       return { host, page };
     }),
@@ -230,6 +236,8 @@ export function useAgentHistory(options: {
    * history matches to other results, where a missing host is not a claim of "no matches".
    */
   searchableHostsOnly?: boolean;
+  /** Leave out agents created by schedule runs, on hosts that support the filter. */
+  hideScheduledRuns?: boolean;
   /** Keep the previous query's results until the next query's arrive. */
   keepPreviousResults?: boolean;
 }): AgentHistoryResult {
@@ -293,12 +301,26 @@ export function useAgentHistory(options: {
     const trimmed = options.search?.trim() ?? "";
     return isSearchSupported ? trimmed : "";
   }, [isSearchSupported, options.search]);
+  // COMPAT(agentHistoryScheduleFilter): added in v0.17.4, remove gate after 2027-05-23.
+  // Gated like search: a host that cannot filter would leave its scheduled runs in the list.
+  const isScheduleFilterSupported = useSessionStore(
+    useCallback(
+      (state) =>
+        targetServerIds.length > 0 &&
+        targetServerIds.every(
+          (id) => state.sessions[id]?.serverInfo?.features?.agentHistoryScheduleFilter === true,
+        ),
+      [targetServerIds],
+    ),
+  );
+  const excludeScheduleRuns = Boolean(options.hideScheduledRuns && isScheduleFilterSupported);
   const queryKey = useMemo(
     () => [
       ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(targetServerIds)),
       search,
+      excludeScheduleRuns,
     ],
-    [search, serverId, targetServerIds],
+    [excludeScheduleRuns, search, serverId, targetServerIds],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
@@ -329,6 +351,7 @@ export function useAgentHistory(options: {
         hosts: targetHosts,
         cursorByServerId: pageParam,
         ...(search ? { search } : {}),
+        ...(excludeScheduleRuns ? { excludeScheduleRuns } : {}),
       });
     },
   });
@@ -386,6 +409,7 @@ export function useAgentHistory(options: {
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
     isSearchTruncated,
+    isScheduleFilterSupported,
     isPreviousResults: isPlaceholderData,
     hostErrors,
     refreshAll,

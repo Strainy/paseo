@@ -1493,6 +1493,9 @@ export const FetchAgentHistoryRequestMessageSchema = z.object({
   // A free-text filter over agent title, workspace name, branch, and project name.
   // Matching rows follow the requested sort and cursor pagination.
   search: z.string().optional(),
+  // COMPAT(agentHistoryScheduleFilter): added in v0.17.4, remove gate after 2027-05-23.
+  // Leaves out agents created by schedule runs, before pagination.
+  excludeScheduleRuns: z.boolean().optional(),
   sort: z
     .array(
       z.object({
@@ -4107,6 +4110,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentTimelinePromptIndex: z.boolean().optional(),
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
+        // COMPAT(agentHistoryScheduleFilter): added in v0.17.4, remove gate after 2027-05-23.
+        agentHistoryScheduleFilter: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
