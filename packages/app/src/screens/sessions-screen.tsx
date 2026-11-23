@@ -62,20 +62,20 @@ function resolveEmptyText(input: {
   return "No sessions for this host";
 }
 
-/** History's per-device "Hide scheduled runs" switch, shown when every target host can filter. */
-function HideScheduledRunsToggle({ visible }: { visible: boolean }): ReactElement | null {
+/** History's per-device "Show scheduled runs" switch, shown when every target host can filter. */
+function ShowScheduledRunsToggle({ visible }: { visible: boolean }): ReactElement | null {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
-  const value = settings.historyHideScheduledRuns;
+  const value = settings.historyShowScheduledRuns;
   const setValue = useCallback(
     (next: boolean) => {
-      void updateSettings({ historyHideScheduledRuns: next });
+      void updateSettings({ historyShowScheduledRuns: next });
     },
     [updateSettings],
   );
 
   if (!visible) return null;
-  const label = t("sessions.actions.hideScheduledRuns");
+  const label = t("sessions.actions.showScheduledRuns");
   return (
     <View style={styles.scheduledToggle}>
       <Text style={styles.scheduledToggleLabel} numberOfLines={1}>
@@ -85,7 +85,7 @@ function HideScheduledRunsToggle({ visible }: { visible: boolean }): ReactElemen
         value={value}
         onValueChange={setValue}
         accessibilityLabel={label}
-        testID="sessions-hide-scheduled-runs"
+        testID="sessions-show-scheduled-runs"
       />
     </View>
   );
@@ -111,7 +111,7 @@ function SessionsScreenContent() {
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const historyServerId = selectedHost === ALL_HOSTS_OPTION_ID ? null : selectedHost;
   const { settings } = useAppSettings();
-  const hideScheduledRuns = settings.historyHideScheduledRuns;
+  const hideScheduledRuns = !settings.historyShowScheduledRuns;
   const {
     agents,
     hasMore,
@@ -211,7 +211,7 @@ function SessionsScreenContent() {
               hostOptionTestID={sessionsHostOptionTestID}
             />
           ) : null}
-          <HideScheduledRunsToggle visible={isScheduleFilterSupported} />
+          <ShowScheduledRunsToggle visible={isScheduleFilterSupported} />
         </View>
       ) : null}
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}

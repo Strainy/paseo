@@ -116,8 +116,8 @@ export interface AppSettings {
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
-  /** History leaves out agents created by schedule runs. */
-  historyHideScheduledRuns: boolean;
+  /** History lists agents created by schedule runs; off leaves them out. */
+  historyShowScheduledRuns: boolean;
 }
 
 export type AppSettingsUpdate =
@@ -175,7 +175,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   filePanelAssociations: {},
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
-  historyHideScheduledRuns: false,
+  historyShowScheduledRuns: true,
 };
 
 export const DEFAULT_APP_SETTINGS: Settings = {
@@ -280,7 +280,7 @@ const StoredAppSettingsSchema = z
     compactToolCalls: z.boolean().optional().catch(undefined),
     chatOutlineEnabled: z.boolean().catch(true),
     vimKeybindings: z.boolean().catch(false),
-    historyHideScheduledRuns: z.boolean().catch(false),
+    historyShowScheduledRuns: z.boolean().catch(true),
     sendShortcut: z.enum(["enter", "mod-enter"]).catch("enter"),
     filePanelAssociations: z.record(z.string(), z.string()).catch({}),
     openInSidePane: z

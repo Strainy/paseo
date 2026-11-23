@@ -305,7 +305,7 @@ export const ko: TranslationResources = {
     actions: {
       loadMore: "더 불러오기",
       clearSearch: "검색 지우기",
-      hideScheduledRuns: "예약 실행 숨기기",
+      showScheduledRuns: "예약 실행 표시",
     },
   },
   agentList: {

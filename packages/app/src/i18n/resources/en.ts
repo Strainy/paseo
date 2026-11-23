@@ -303,7 +303,7 @@ export const en = {
     actions: {
       loadMore: "Load more",
       clearSearch: "Clear search",
-      hideScheduledRuns: "Hide scheduled runs",
+      showScheduledRuns: "Show scheduled runs",
     },
   },
   agentList: {

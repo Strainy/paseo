@@ -308,7 +308,7 @@ export const ptBR: TranslationResources = {
     actions: {
       loadMore: "Carregar mais",
       clearSearch: "Limpar busca",
-      hideScheduledRuns: "Ocultar execuções agendadas",
+      showScheduledRuns: "Mostrar execuções agendadas",
     },
   },
   agentList: {
